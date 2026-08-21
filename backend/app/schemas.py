@@ -32,7 +32,8 @@ class Verse(BaseModel):
 
 
 class Paragraph(BaseModel):
-    kind: Literal["heading", "text"]
+    # "chapter" marks the start of a new chapter in a multi-chapter passage.
+    kind: Literal["heading", "text", "chapter"]
     style: str
     heading: str = ""
     verses: list[Verse] = []

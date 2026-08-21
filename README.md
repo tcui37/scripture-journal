@@ -1,8 +1,8 @@
 # Scripture Journal
 
 Generate printable A4 scripture journalling pages: a passage on one side, ruled
-space to write on the other. Pick a translation, book and verse range, choose a
-layout, then print or save as PDF.
+space to write on the other. Pick a translation and a range — a few verses, a
+chapter, or an entire book — choose a layout, then print or save as PDF.
 
 Next.js frontend, FastAPI backend, scripture from [api.bible](https://scripture.api.bible/).
 
@@ -14,7 +14,16 @@ backend/     FastAPI — holds the api.bible key, proxies the API,
 frontend/    Next.js App Router — page layout, pagination, print styles
 ```
 
-Pagination has to run in the browser: page breaks depend on how tall the text
+Two things are worth knowing about the design:
+
+**Ranges are fetched one chapter at a time.** api.bible's `/passages` endpoint
+silently truncates long requests — ask for John 1:1–21:25 and it returns John
+1:1–5:34 with no error. So the backend requests each chapter in the range
+whole (concurrently, capped), then trims the first and last chapters to the
+requested verses. A whole book of Psalms — 150 chapters, 2461 verses — comes
+back in about two seconds.
+
+**Pagination runs in the browser.** Page breaks depend on how tall text
 actually renders, which is only knowable after layout. The frontend measures
 candidate markup in a hidden div and binary-searches for the split point.
 
@@ -73,6 +82,8 @@ cd backend && fastapi run app/main.py
 
 - Which translations you can read depends on your api.bible key. The eight
   English versions offered in the UI are listed in `backend/app/bible.py`.
+- A range may span at most `MAX_CHAPTERS` (150, the length of Psalms), also in
+  `backend/app/bible.py`.
 - Settings and the current reference persist in `localStorage`.
 - Print from the browser with A4 paper, margins **none**, and background
   graphics **on** so the ruled lines and paper tint come through.

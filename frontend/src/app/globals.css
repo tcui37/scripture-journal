@@ -8,6 +8,7 @@
 
   --color-neutral-100: #f9f4ed;
   --color-neutral-300: #dcd3c4;
+  --color-neutral-400: #c0b6a5;
   --color-neutral-500: #a19786;
   --color-neutral-600: #82796a;
   --color-neutral-700: #645c50;
@@ -133,10 +134,17 @@ button {
   color: var(--color-neutral-500);
 }
 
-.field {
+.control {
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -144,7 +152,14 @@ button {
   font-weight: 600;
 }
 
-.field select {
+.control-value {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 700;
+  color: var(--color-neutral-800);
+}
+
+.control select {
   width: 100%;
   padding: 10px 14px;
   background: var(--color-neutral-100);
@@ -152,14 +167,96 @@ button {
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
   font-size: 14px;
-  text-transform: none;
-  letter-spacing: normal;
-  font-weight: 400;
 }
 
-.field input[type="range"] {
+.control select:disabled {
+  opacity: 0.5;
+}
+
+.control input[type="range"] {
   width: 100%;
   accent-color: var(--color-accent);
+}
+
+/* — checkbox list — */
+
+.toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 4px;
+  font-size: 12.5px;
+  color: var(--color-neutral-800);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.toggle:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-box {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 5px;
+  border: 1.5px solid var(--color-neutral-400);
+  background: var(--color-neutral-100);
+  position: relative;
+}
+
+.toggle input:checked + .toggle-box {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.toggle input:checked + .toggle-box::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1.5px;
+  width: 4px;
+  height: 9px;
+  border: solid var(--color-neutral-100);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.toggle input:focus-visible + .toggle-box {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* — passage summary — */
+
+.quick-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.summary {
+  margin-top: 2px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-accent-700);
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-weight: 600;
 }
 
 .grid-2 {
@@ -301,10 +398,28 @@ button {
   white-space: nowrap;
 }
 
+.topbar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+}
+
 .topbar-status {
   font-size: 12px;
   color: var(--color-neutral-600);
   white-space: nowrap;
+}
+
+.topbar-status.is-error {
+  color: #a3341f;
+  font-weight: 600;
+}
+
+.zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .zoom {

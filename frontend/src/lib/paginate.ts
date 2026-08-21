@@ -56,7 +56,8 @@ export function paginate(
   };
 
   for (const paragraph of paragraphs) {
-    if (paragraph.kind === "heading") {
+    // Headings and chapter markers are indivisible blocks.
+    if (paragraph.kind !== "text") {
       const html = paragraphHtml(paragraph, settings);
       if (!html) continue;
       const height = measurer.measure(html, slotWidth);

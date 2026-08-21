@@ -27,7 +27,8 @@ export interface Verse {
 }
 
 export interface Paragraph {
-  kind: "heading" | "text";
+  /** "chapter" marks a chapter boundary within a multi-chapter passage. */
+  kind: "heading" | "text" | "chapter";
   style: string;
   heading: string;
   verses: Verse[];
@@ -60,13 +61,18 @@ export interface Settings {
   paper: Paper;
   justify: boolean;
   showHeadings: boolean;
+  showChapterNumbers: boolean;
 }
 
-/** Which passage is on screen. */
+/**
+ * Which passage is on screen. The range may span chapters, so the start verse
+ * belongs to `startChapter` and the end verse to `endChapter`.
+ */
 export interface Reference {
   bibleId: string;
   bookId: string;
-  chapter: string;
-  start: string;
-  end: string;
+  startChapter: string;
+  startVerse: string;
+  endChapter: string;
+  endVerse: string;
 }

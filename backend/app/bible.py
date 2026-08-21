@@ -22,6 +22,12 @@ ENGLISH_BIBLES: list[tuple[str, str]] = [
 ]
 
 
+# api.bible silently truncates long /passages requests, so a range is fetched
+# one chapter at a time. These bound how much work a single request can cause.
+MAX_CHAPTERS = 150  # Psalms, the longest book
+MAX_CONCURRENT_CHAPTERS = 8
+
+
 class BibleClient:
     def __init__(self, *, base_url: str, api_key: str, timeout: float) -> None:
         self._client = httpx.AsyncClient(

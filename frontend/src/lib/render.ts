@@ -54,6 +54,12 @@ function verseHtml(verse: Verse, settings: Settings) {
 
 /** `upto` renders only the first N verses, used to find a page break. */
 export function paragraphHtml(paragraph: Paragraph, settings: Settings, upto?: number) {
+  if (paragraph.kind === "chapter") {
+    if (!settings.showChapterNumbers) return "";
+    const size = (settings.size * 0.95).toFixed(1);
+    return `<div style="font-family:${SANS};font-size:${size}pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${INK};margin:1.6em 0 .6em">Chapter ${escapeHtml(paragraph.heading)}</div>`;
+  }
+
   if (paragraph.kind === "heading") {
     if (!settings.showHeadings) return "";
     const size = (settings.size * 0.84).toFixed(1);

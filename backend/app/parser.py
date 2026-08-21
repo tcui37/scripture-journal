@@ -49,6 +49,64 @@ def _walk(items: list[dict[str, Any]] | None, para: Paragraph, *, wj: bool, ital
                 _walk(item.get("items"), para, wj=wj, italic=italic)
 
 
+def trim_verses(
+    paragraphs: list[Paragraph],
+    *,
+    first: int | None = None,
+    last: int | None = None,
+) -> list[Paragraph]:
+    """Drop verses outside [first, last]; used on the end chapters of a range."""
+    if first is None and last is None:
+        return paragraphs
+
+    kept_paragraphs: list[Paragraph] = []
+
+    for para in paragraphs:
+        if para.kind != "text":
+            kept_paragraphs.append(para)
+            continue
+
+        kept: list[Verse] = []
+        for verse in para.verses:
+            number = int(verse.number) if verse.number and verse.number.isdigit() else None
+            if number is None:
+                # Unnumbered lead-in text belongs to the verse before it.
+                if kept:
+                    kept.append(verse)
+                continue
+            if first is not None and number < first:
+                continue
+            if last is not None and number > last:
+                continue
+            kept.append(verse)
+
+        if kept:
+            para.verses = kept
+            kept_paragraphs.append(para)
+
+    return drop_orphan_headings(kept_paragraphs)
+
+
+def drop_orphan_headings(paragraphs: list[Paragraph]) -> list[Paragraph]:
+    """Remove headings left with no scripture under them after trimming."""
+    out: list[Paragraph] = []
+
+    for index, para in enumerate(paragraphs):
+        if para.kind == "heading":
+            has_text = False
+            for later in paragraphs[index + 1 :]:
+                if later.kind == "heading":
+                    break
+                if later.kind == "text" and later.verses:
+                    has_text = True
+                    break
+            if not has_text:
+                continue
+        out.append(para)
+
+    return out
+
+
 def parse_content(content: list[dict[str, Any]] | None) -> list[Paragraph]:
     paragraphs: list[Paragraph] = []
 

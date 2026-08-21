@@ -32,10 +32,15 @@ export const fetchVerseNumbers = (
   );
 
 export const fetchPassage = (reference: Reference, signal: AbortSignal) => {
-  const { bibleId, bookId, chapter, start, end } = reference;
-  const query = new URLSearchParams({ start, end });
+  const { bibleId, bookId, startChapter, startVerse, endChapter, endVerse } = reference;
+  const query = new URLSearchParams({
+    start_chapter: startChapter,
+    start_verse: startVerse,
+    end_chapter: endChapter,
+    end_verse: endVerse,
+  });
   return getJson<Passage>(
-    `/api/bibles/${bibleId}/books/${bookId}/chapters/${chapter}/passage?${query}`,
+    `/api/bibles/${bibleId}/books/${bookId}/passage?${query}`,
     signal,
   );
 };
