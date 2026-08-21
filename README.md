@@ -34,6 +34,13 @@ keeps its proportions across A4/Letter and portrait/landscape. The `@page size`
 rule is generated from the current setting, since `@page` cannot read CSS
 variables.
 
+**The writing area is drawn as SVG, not a CSS background.** A
+`repeating-linear-gradient` becomes a tiled bitmap; when the tile height
+doesn't land on whole device pixels, successive tiles snap alternately up and
+down and the ruling prints visibly uneven. One `<path>` per writing area places
+every line explicitly, which stays vector into the PDF and costs two DOM nodes
+regardless of how many lines there are.
+
 ## Setup
 
 You need an api.bible key — free at <https://scripture.api.bible/>.
