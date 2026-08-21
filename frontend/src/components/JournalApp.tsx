@@ -3,14 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchBibles, fetchBooks, fetchPassage, fetchVerseNumbers } from "@/lib/api";
-import {
-  DEFAULT_REFERENCE,
-  DEFAULT_SETTINGS,
-  PAGE_WIDTH,
-  STORAGE_KEY,
-  ZOOM_OPTIONS,
-} from "@/lib/constants";
+import { DEFAULT_REFERENCE, DEFAULT_SETTINGS, STORAGE_KEY, ZOOM_OPTIONS } from "@/lib/constants";
 import { Measurer, paginate } from "@/lib/paginate";
+import { pageDimensions } from "@/lib/render";
 import type { BibleSummary, Book, Passage, Reference, Settings } from "@/lib/types";
 
 import PageStack from "./PageStack";
@@ -265,6 +260,8 @@ export default function JournalApp() {
   const [zoom, setZoom] = useState<ZoomId>("fit");
   const [scale, setScale] = useState(0.62);
 
+  const sheet = pageDimensions(settings);
+
   useEffect(() => {
     if (zoom !== "fit") {
       setScale(Number(zoom));
@@ -274,13 +271,13 @@ export default function JournalApp() {
     if (!desk) return;
 
     const update = () =>
-      setScale(Math.min(1, Math.max(0.25, (desk.clientWidth - 90) / PAGE_WIDTH)));
+      setScale(Math.min(1, Math.max(0.25, (desk.clientWidth - 90) / sheet.width)));
 
     update();
     const observer = new ResizeObserver(update);
     observer.observe(desk);
     return () => observer.disconnect();
-  }, [zoom]);
+  }, [zoom, sheet.width]);
 
   /* ── handlers ────────────────────────────────────────────────────────── */
 
@@ -374,16 +371,21 @@ export default function JournalApp() {
   const pageCount = pages ? (settings.layout === "verso" ? pages.length * 2 : pages.length) : 0;
   const chapterSpan = Number(reference.endChapter) - Number(reference.startChapter) + 1;
 
+  const pageCountLabel = `${pageCount} ${settings.pageSize} page${pageCount === 1 ? "" : "s"}`;
+
   const summary = useMemo(() => {
     if (!bookName || !pages) return "";
     const chapters = chapterSpan > 1 ? `${chapterSpan} chapters` : "1 chapter";
-    return `${referenceLabel} · ${chapters} · ${pageCount} A4 page${pageCount === 1 ? "" : "s"}`;
-  }, [bookName, pages, chapterSpan, referenceLabel, pageCount]);
+    return `${referenceLabel} · ${chapters} · ${pageCountLabel}`;
+  }, [bookName, pages, chapterSpan, referenceLabel, pageCountLabel]);
 
-  const statusText = status || (pages ? `${pageCount} A4 page${pageCount === 1 ? "" : "s"}` : "");
+  const statusText = status || (pages ? pageCountLabel : "");
 
   return (
     <div className="app">
+      {/* @page can't read CSS variables, so the rule is generated per setting. */}
+      <style>{`@page { size: ${settings.pageSize === "Letter" ? "letter" : "A4"} ${settings.orientation}; margin: 0; }`}</style>
+
       <Sidebar
         bibles={bibles}
         books={books.list}

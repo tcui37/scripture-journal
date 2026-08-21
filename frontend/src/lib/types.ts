@@ -46,9 +46,13 @@ export type FontChoice = "serif" | "sans";
 export type NumberStyle = "sup" | "inline";
 export type Flow = "para" | "line";
 export type Paper = "Ivory" | "Bright white" | "Warm grey";
+export type PageSize = "A4" | "Letter";
+export type Orientation = "portrait" | "landscape";
 
 /** Everything that affects how a page is drawn. */
 export interface Settings {
+  pageSize: PageSize;
+  orientation: Orientation;
   layout: Layout;
   lines: LineStyle;
   font: FontChoice;

@@ -1,8 +1,9 @@
 # Scripture Journal
 
-Generate printable A4 scripture journalling pages: a passage on one side, ruled
+Generate printable scripture journalling pages: a passage on one side, ruled
 space to write on the other. Pick a translation and a range — a few verses, a
-chapter, or an entire book — choose a layout, then print or save as PDF.
+chapter, or an entire book — choose a sheet size and layout, then print or save
+as PDF. A4 or Letter, portrait or landscape.
 
 Next.js frontend, FastAPI backend, scripture from [api.bible](https://scripture.api.bible/).
 
@@ -26,6 +27,12 @@ back in about two seconds.
 **Pagination runs in the browser.** Page breaks depend on how tall text
 actually renders, which is only knowable after layout. The frontend measures
 candidate markup in a hidden div and binary-searches for the split point.
+
+Sheet geometry lives in `frontend/src/lib/render.ts`. Column widths are
+fractions of the printable width rather than fixed pixels, so each arrangement
+keeps its proportions across A4/Letter and portrait/landscape. The `@page size`
+rule is generated from the current setting, since `@page` cannot read CSS
+variables.
 
 ## Setup
 
@@ -85,5 +92,6 @@ cd backend && fastapi run app/main.py
 - A range may span at most `MAX_CHAPTERS` (150, the length of Psalms), also in
   `backend/app/bible.py`.
 - Settings and the current reference persist in `localStorage`.
-- Print from the browser with A4 paper, margins **none**, and background
-  graphics **on** so the ruled lines and paper tint come through.
+- When printing, set margins to **none** and background graphics **on**, so the
+  ruled lines and paper tint come through. Paper size and orientation are
+  already driven by the in-app setting.

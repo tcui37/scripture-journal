@@ -1,19 +1,18 @@
 /**
  * Builds the printable page markup as HTML strings.
  *
- * Pages are absolutely-positioned boxes at a fixed A4 pixel size, so the same
+ * Pages are absolutely-positioned boxes at a fixed pixel size, so the same
  * markup measures, previews and prints identically. Everything here is pure:
  * the pagination pass calls it repeatedly to measure trial layouts.
  */
 
 import {
+  FOOTER,
   HAIRLINE,
   INK,
   MARGIN,
   MUTED,
-  PAGE_HEIGHT,
-  PAGE_WIDTH,
-  FOOTER,
+  PAGE_SIZES,
   RULE,
   WORDS_OF_CHRIST,
 } from "./constants";
@@ -23,6 +22,14 @@ const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const SANS = "var(--font-body), system-ui, sans-serif";
+
+/** Sheet size in CSS pixels, with orientation applied. */
+export function pageDimensions(settings: Settings) {
+  const { width, height } = PAGE_SIZES[settings.pageSize];
+  return settings.orientation === "landscape"
+    ? { width: height, height: width }
+    : { width, height };
+}
 
 function typeCss(settings: Settings) {
   const family =
@@ -85,44 +92,134 @@ export function paragraphHtml(paragraph: Paragraph, settings: Settings, upto?: n
   return `<p style="${base}margin:0 0 .5em;padding-left:${indent};${align}">${body}</p>`;
 }
 
-export interface Slot {
+export interface Box {
+  x: number;
+  y: number;
   width: number;
   height: number;
 }
 
-export interface Geometry {
-  slots: Slot[];
-  perPage: number;
-  available: number;
+interface LineBox extends Box {
+  /** Hairline separating the writing area from the text. */
+  border?: "left" | "top";
 }
 
-/** Where text may flow on a page, per layout. */
+export interface Geometry {
+  page: { width: number; height: number };
+  /** Usable height between the margins, above the footer. */
+  available: number;
+  /** Text slots in flow order. */
+  slots: Box[];
+  /** Ruled or dotted writing areas. */
+  lineBoxes: LineBox[];
+  /** Text slots consumed per sheet. */
+  perPage: number;
+}
+
+// Proportions of the inner width, measured from the original A4 design so
+// every layout keeps its look on Letter and in landscape.
+const TEXT_FRACTION_RIGHT = 0.5714;
+const MARGIN_FRACTION_TWOCOL = 0.2653;
+const CENTRE_FRACTION_WIDE = 0.5073;
+const TEXT_FRACTION_BOTTOM = 0.54;
+
+/** Where text and writing areas sit on a page, for the current settings. */
 export function geometry(settings: Settings): Geometry {
-  const available = PAGE_HEIGHT - 2 * MARGIN - (settings.pageNumbers ? FOOTER : 8);
-  const inner = PAGE_WIDTH - 2 * MARGIN;
+  const page = pageDimensions(settings);
+  const inner = page.width - 2 * MARGIN;
+  const available = page.height - 2 * MARGIN - (settings.pageNumbers ? FOOTER : 8);
+  const full = { x: MARGIN, y: MARGIN, width: inner, height: available };
 
   switch (settings.layout) {
-    case "right":
-      return { slots: [{ width: 392, height: available }], perPage: 1, available };
-    case "bottom":
+    case "right": {
+      const gutter = 26;
+      const textWidth = Math.round(inner * TEXT_FRACTION_RIGHT);
       return {
-        slots: [{ width: inner, height: Math.round(available * 0.54) }],
+        page,
+        available,
         perPage: 1,
-        available,
-      };
-    case "twocol":
-      return {
-        slots: [
-          { width: 228, height: available },
-          { width: 228, height: available },
+        slots: [{ ...full, width: textWidth }],
+        lineBoxes: [
+          {
+            x: MARGIN + textWidth + gutter,
+            y: MARGIN,
+            width: inner - textWidth - gutter,
+            height: available,
+            border: "left",
+          },
         ],
-        perPage: 2,
-        available,
       };
+    }
+
+    case "bottom": {
+      const gap = 22;
+      const textHeight = Math.round(available * TEXT_FRACTION_BOTTOM);
+      return {
+        page,
+        available,
+        perPage: 1,
+        slots: [{ ...full, height: textHeight }],
+        lineBoxes: [
+          {
+            x: MARGIN,
+            y: MARGIN + textHeight + gap,
+            width: inner,
+            height: available - textHeight - gap,
+            border: "top",
+          },
+        ],
+      };
+    }
+
+    case "twocol": {
+      const gutter = 22;
+      const rule = 26;
+      const marginWidth = Math.round(inner * MARGIN_FRACTION_TWOCOL);
+      const column = Math.floor((inner - marginWidth - rule - gutter) / 2);
+      return {
+        page,
+        available,
+        perPage: 2,
+        slots: [
+          { ...full, width: column },
+          { ...full, x: MARGIN + column + gutter, width: column },
+        ],
+        lineBoxes: [
+          {
+            x: MARGIN + column * 2 + gutter + rule,
+            y: MARGIN,
+            width: inner - column * 2 - gutter - rule,
+            height: available,
+            border: "left",
+          },
+        ],
+      };
+    }
+
     case "verso":
-      return { slots: [{ width: inner, height: available }], perPage: 1, available };
-    default:
-      return { slots: [{ width: 348, height: available }], perPage: 1, available };
+      // The facing lined page is generated separately, as a blank sheet.
+      return { page, available, perPage: 1, slots: [full], lineBoxes: [] };
+
+    default: {
+      const gap = 22;
+      const centre = Math.round(inner * CENTRE_FRACTION_WIDE);
+      const side = Math.round((inner - centre - gap * 2) / 2);
+      return {
+        page,
+        available,
+        perPage: 1,
+        slots: [{ ...full, x: MARGIN + side + gap, width: centre }],
+        lineBoxes: [
+          { x: MARGIN, y: MARGIN, width: side, height: available },
+          {
+            x: MARGIN + side + gap + centre + gap,
+            y: MARGIN,
+            width: side,
+            height: available,
+          },
+        ],
+      };
+    }
   }
 }
 
@@ -136,50 +233,62 @@ function linesCss(settings: Settings) {
   return `background-image:repeating-linear-gradient(to bottom, transparent 0 ${pitch - 1}px, ${RULE} ${pitch - 1}px, ${RULE} ${pitch}px);background-position:0 6px;`;
 }
 
+const position = (box: Box) =>
+  `position:absolute;left:${box.x}px;top:${box.y}px;width:${box.width}px;height:${box.height}px;`;
+
+function lineBoxHtml(box: LineBox, lines: string) {
+  if (box.border === "left") {
+    return `<div style="${position(box)}border-left:1px solid ${HAIRLINE};padding-left:16px"><div style="height:100%;${lines}"></div></div>`;
+  }
+  if (box.border === "top") {
+    return `<div style="${position(box)}border-top:1px solid ${HAIRLINE};padding-top:14px"><div style="height:100%;${lines}"></div></div>`;
+  }
+  return `<div style="${position(box)}${lines}"></div>`;
+}
+
 export interface PageOptions {
   slots: string[];
   pageNumber: number;
   total: number;
+  /** A facing page in the verso layout: writing area only. */
   blank: boolean;
   reference: string;
   settings: Settings;
 }
 
-export function pageHtml({ slots, pageNumber, total, blank, reference, settings }: PageOptions) {
+export function pageHtml({
+  slots,
+  pageNumber,
+  total,
+  blank,
+  reference,
+  settings,
+}: PageOptions) {
   const geo = geometry(settings);
   const lines = linesCss(settings);
-  const inner = PAGE_WIDTH - 2 * MARGIN;
 
   const footer = settings.pageNumbers
     ? `<div style="position:absolute;left:${MARGIN}px;right:${MARGIN}px;bottom:${Math.round(MARGIN * 0.52)}px;display:flex;justify-content:space-between;font-family:${SANS};font-size:8pt;letter-spacing:.06em;color:${MUTED}"><span>${escapeHtml(reference)}</span><span>${pageNumber} / ${total}</span></div>`
     : "";
 
-  let body: string;
-
   if (blank) {
-    body = `<div style="position:absolute;left:${MARGIN}px;top:${MARGIN}px;width:${inner}px;height:${geo.available}px;${lines}"></div>`;
-  } else if (settings.layout === "right") {
-    body = `<div style="position:absolute;left:${MARGIN}px;top:${MARGIN}px;width:392px;height:${geo.available}px;overflow:hidden">${slots[0] ?? ""}</div>
-      <div style="position:absolute;left:${MARGIN + 392 + 26}px;top:${MARGIN}px;width:${inner - 392 - 26}px;height:${geo.available}px;border-left:1px solid ${HAIRLINE};padding-left:16px"><div style="height:100%;${lines}"></div></div>`;
-  } else if (settings.layout === "bottom") {
-    const textHeight = geo.slots[0].height;
-    body = `<div style="position:absolute;left:${MARGIN}px;top:${MARGIN}px;width:${inner}px;height:${textHeight}px;overflow:hidden">${slots[0] ?? ""}</div>
-      <div style="position:absolute;left:${MARGIN}px;top:${MARGIN + textHeight + 22}px;width:${inner}px;height:${geo.available - textHeight - 22}px;border-top:1px solid ${HAIRLINE};padding-top:14px"><div style="height:100%;${lines}"></div></div>`;
-  } else if (settings.layout === "twocol") {
-    const gutter = 22;
-    const marginLeft = MARGIN + 228 * 2 + gutter + 26;
-    body = `<div style="position:absolute;left:${MARGIN}px;top:${MARGIN}px;width:228px;height:${geo.available}px;overflow:hidden">${slots[0] ?? ""}</div>
-      <div style="position:absolute;left:${MARGIN + 228 + gutter}px;top:${MARGIN}px;width:228px;height:${geo.available}px;overflow:hidden">${slots[1] ?? ""}</div>
-      <div style="position:absolute;left:${marginLeft}px;top:${MARGIN}px;width:${inner - 228 * 2 - gutter - 26}px;height:${geo.available}px;border-left:1px solid ${HAIRLINE};padding-left:14px"><div style="height:100%;${lines}"></div></div>`;
-  } else if (settings.layout === "verso") {
-    body = `<div style="position:absolute;left:${MARGIN}px;top:${MARGIN}px;width:${inner}px;height:${geo.available}px;overflow:hidden">${slots[0] ?? ""}</div>`;
-  } else {
-    const columnWidth = 348;
-    const side = Math.round((inner - columnWidth - 44) / 2);
-    body = `<div style="position:absolute;left:${MARGIN + side + 22}px;top:${MARGIN}px;width:${columnWidth}px;height:${geo.available}px;overflow:hidden">${slots[0] ?? ""}</div>
-      <div style="position:absolute;left:${MARGIN}px;top:${MARGIN}px;width:${side}px;height:${geo.available}px;${lines}"></div>
-      <div style="position:absolute;left:${MARGIN + side + 22 + columnWidth + 22}px;top:${MARGIN}px;width:${side}px;height:${geo.available}px;${lines}"></div>`;
+    const full: Box = {
+      x: MARGIN,
+      y: MARGIN,
+      width: geo.page.width - 2 * MARGIN,
+      height: geo.available,
+    };
+    return lineBoxHtml(full, lines) + footer;
   }
 
-  return body + footer;
+  const text = geo.slots
+    .map(
+      (box, index) =>
+        `<div style="${position(box)}overflow:hidden">${slots[index] ?? ""}</div>`,
+    )
+    .join("");
+
+  const writing = geo.lineBoxes.map((box) => lineBoxHtml(box, lines)).join("");
+
+  return text + writing + footer;
 }

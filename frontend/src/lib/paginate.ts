@@ -45,14 +45,17 @@ export function paginate(
   let slotIndex = 0;
   let current = "";
   let currentHeight = 0;
-  let { height: slotHeight, width: slotWidth } = geo.slots[0];
+  let slotHeight = geo.slots[0].height;
+  let slotWidth = geo.slots[0].width;
 
   const nextSlot = () => {
     slots.push(current);
     current = "";
     currentHeight = 0;
     slotIndex += 1;
-    ({ height: slotHeight, width: slotWidth } = geo.slots[slotIndex % geo.slots.length]);
+    const box = geo.slots[slotIndex % geo.slots.length];
+    slotHeight = box.height;
+    slotWidth = box.width;
   };
 
   for (const paragraph of paragraphs) {

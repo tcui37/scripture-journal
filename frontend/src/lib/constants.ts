@@ -1,8 +1,12 @@
 import type { Settings } from "./types";
 
-/** A4 at 96dpi, plus the print margin and footer strip. */
-export const PAGE_WIDTH = 794;
-export const PAGE_HEIGHT = 1123;
+/** Sheet sizes in CSS pixels at 96dpi, portrait. */
+export const PAGE_SIZES = {
+  A4: { width: 794, height: 1123 }, // 210 × 297 mm
+  Letter: { width: 816, height: 1056 }, // 8.5 × 11 in
+} as const;
+
+/** Print margin and footer strip, shared by every sheet size. */
 export const MARGIN = 54;
 export const FOOTER = 26;
 
@@ -22,6 +26,8 @@ export const PAPER_COLORS: Record<string, string> = {
 export const STORAGE_KEY = "scripture-journal-v2";
 
 export const DEFAULT_SETTINGS: Settings = {
+  pageSize: "A4",
+  orientation: "portrait",
   layout: "right",
   lines: "ruled",
   font: "serif",
@@ -45,6 +51,16 @@ export const DEFAULT_REFERENCE = {
   endChapter: "1",
   endVerse: "18",
 };
+
+export const PAGE_SIZE_OPTIONS = [
+  { id: "A4", label: "A4" },
+  { id: "Letter", label: "Letter" },
+] as const;
+
+export const ORIENTATION_OPTIONS = [
+  { id: "portrait", label: "Portrait" },
+  { id: "landscape", label: "Landscape" },
+] as const;
 
 export const LAYOUT_OPTIONS = [
   {

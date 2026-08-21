@@ -4,6 +4,8 @@ import {
   LAYOUT_OPTIONS,
   LINE_OPTIONS,
   NUMBER_OPTIONS,
+  ORIENTATION_OPTIONS,
+  PAGE_SIZE_OPTIONS,
   PAPER_OPTIONS,
   TEXT_TOGGLES,
 } from "@/lib/constants";
@@ -166,6 +168,18 @@ export default function Sidebar({
         <section className="section">
           <div className="section-title">02&nbsp;&nbsp;Page layout</div>
 
+          <OptionGroup
+            title="Paper size"
+            options={PAGE_SIZE_OPTIONS}
+            value={settings.pageSize}
+            onChange={(pageSize) => onSettingsChange({ pageSize })}
+          />
+          <OptionGroup
+            title="Orientation"
+            options={ORIENTATION_OPTIONS}
+            value={settings.orientation}
+            onChange={(orientation) => onSettingsChange({ orientation })}
+          />
           <OptionGroup
             title="Arrangement"
             options={LAYOUT_OPTIONS}

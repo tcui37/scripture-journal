@@ -467,10 +467,7 @@ button {
 
 /* ── print ─────────────────────────────────────────────────────────────── */
 
-@page {
-  size: A4;
-  margin: 0;
-}
+/* The @page size rule is generated per setting in JournalApp. */
 
 @media print {
   html,
