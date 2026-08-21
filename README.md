@@ -92,6 +92,10 @@ cd backend && fastapi run app/main.py
 - A range may span at most `MAX_CHAPTERS` (150, the length of Psalms), also in
   `backend/app/bible.py`.
 - Settings and the current reference persist in `localStorage`.
-- When printing, set margins to **none** and background graphics **on**, so the
-  ruled lines and paper tint come through. Paper size and orientation are
-  already driven by the in-app setting.
+- Paper size, orientation and margins are all driven by the in-app settings, so
+  the browser's print dialog needs no adjusting. The ruled lines and paper tint
+  are backgrounds, which browsers drop by default and recolour for legibility —
+  `print-color-adjust: exact` on `.jpage` overrides both, so they survive with
+  "Background graphics" left off.
+- A printer set to greyscale will still print grey; that is outside the page's
+  control.

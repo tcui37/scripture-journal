@@ -461,6 +461,15 @@ button {
   break-after: page;
 }
 
+/* Print the paper tint and ruled lines even when the browser's "Background
+   graphics" option is off, and stop it darkening the muted greys for
+   legibility — the whole point here is the exact colours. */
+.jpage,
+.jpage * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 .jpage:last-child {
   break-after: auto;
 }
