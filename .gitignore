@@ -1,0 +1,16 @@
+# secrets
+.env
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+
+# node / next
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# os
+.DS_Store

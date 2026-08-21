@@ -1,0 +1,395 @@
+/* Design tokens carried over from the original "Organic" design system. */
+:root {
+  --color-bg: #f5ead8;
+  --color-surface: #ebddc5;
+  --color-text: #201e1d;
+  --color-accent: #c67139;
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+
+  --color-neutral-100: #f9f4ed;
+  --color-neutral-300: #dcd3c4;
+  --color-neutral-500: #a19786;
+  --color-neutral-600: #82796a;
+  --color-neutral-700: #645c50;
+  --color-neutral-800: #474238;
+  --color-neutral-900: #2e2b25;
+
+  --color-accent-600: #b2622d;
+  --color-accent-700: #8c491a;
+
+  --space-2: 8.8px;
+  --space-3: 13.2px;
+  --space-4: 17.6px;
+  --space-6: 26.4px;
+  --space-8: 35.2px;
+
+  --radius-md: 16px;
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+select,
+input,
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── app frame ─────────────────────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.rail {
+  width: 352px;
+  flex: none;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-neutral-100);
+  border-right: 1px solid var(--color-divider);
+  display: flex;
+  flex-direction: column;
+}
+
+.rail-header {
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+.rail-title {
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--color-neutral-900);
+}
+
+.rail-tagline {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  color: var(--color-neutral-600);
+}
+
+.rail-body {
+  padding: var(--space-2) var(--space-6) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.rail-footer {
+  margin-top: auto;
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--color-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.copyright {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-500);
+}
+
+/* ── sidebar controls ──────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-600);
+  font-weight: 600;
+}
+
+.field select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-neutral-100);
+  color: var(--color-text);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 999px;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.field input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Pill-shaped toggle used for every segmented choice in the rail. */
+.opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  background: transparent;
+  color: var(--color-neutral-700);
+  border: 1px solid var(--color-neutral-300);
+}
+
+.opt:hover:not(.is-on) {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.opt.is-on {
+  font-weight: 700;
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-100);
+  border-color: var(--color-neutral-800);
+}
+
+.opt.is-tall {
+  padding: 11px 16px;
+  border-radius: var(--radius-md);
+}
+
+.opt-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.opt-hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  opacity: 0.72;
+  font-weight: 400;
+}
+
+.link-button {
+  align-self: flex-start;
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-700);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.link-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.print-button {
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--color-accent);
+  color: var(--color-neutral-100);
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.print-button:hover {
+  background: var(--color-accent-600);
+}
+
+.print-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── preview surface ───────────────────────────────────────────────────── */
+
+.desk {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-surface);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-neutral-100);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.topbar-reference {
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.topbar-status {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  white-space: nowrap;
+}
+
+.zoom {
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--color-neutral-600);
+  border: 1px solid var(--color-neutral-300);
+}
+
+.zoom.is-on {
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-100);
+  border-color: var(--color-neutral-800);
+}
+
+.desk-inner {
+  padding: var(--space-8) var(--space-6) 60px;
+  display: flex;
+  justify-content: center;
+}
+
+.pagestack {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.jpage {
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  border-radius: 2px;
+  overflow: hidden;
+  break-inside: avoid;
+  break-after: page;
+}
+
+.jpage:last-child {
+  break-after: auto;
+}
+
+/* ── print ─────────────────────────────────────────────────────────────── */
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .rail,
+  .topbar {
+    display: none !important;
+  }
+
+  .desk {
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .desk-inner {
+    padding: 0 !important;
+  }
+
+  .app {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .pagestack {
+    zoom: 1 !important;
+    gap: 0 !important;
+  }
+
+  .jpage {
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}
