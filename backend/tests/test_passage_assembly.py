@@ -11,11 +11,14 @@ import asyncio
 import pytest
 
 from app.providers.base import (
+    build_reference,
+    canonical_books,
     fetch_chapters,
     partial_bounds,
     with_chapter_markers,
 )
 from app.providers.bible_api.provider import BibleApiProvider
+from app.providers.esv.provider import EsvProvider
 from app.providers.helloao.provider import HelloAoProvider
 from app.schemas import Paragraph
 
@@ -79,6 +82,28 @@ async def test_fetch_chapters_respects_the_concurrency_limit():
 
     await fetch_chapters(list(range(12)), fetch, limit=3)
     assert peak <= 3, f"ran {peak} at once with a limit of 3"
+
+
+def test_build_reference_single_verse_omits_the_dash():
+    assert build_reference("JHN", 3, 16, 3, 16) == "John 3:16"
+
+
+def test_build_reference_same_chapter_and_spanning_ranges():
+    assert build_reference("JHN", 3, 16, 3, 17) == "John 3:16–17"
+    assert build_reference("JHN", 1, 1, 2, 5) == "John 1:1–2:5"
+
+
+def test_build_reference_unknown_book_uses_the_id():
+    assert build_reference("TOB", 1, 1, 1, 2) == "TOB 1:1–2"
+
+
+def test_canonical_books_can_drop_the_old_testament():
+    """YLT (and any NT-only edition) must not be offered Genesis through Malachi."""
+    whole = canonical_books()
+    nt = canonical_books(new_testament_only=True)
+    assert whole[0].id == "GEN" and whole[-1].id == "REV"
+    assert nt[0].id == "MAT" and nt[-1].id == "REV"
+    assert {book.id for book in nt}.isdisjoint({"GEN", "PSA", "MAL"})
 
 
 # ── end to end through a provider, with a stub client ─────────────────────
@@ -195,3 +220,32 @@ async def test_bible_api_asks_for_a_whole_chapter_outside_the_canon():
     await provider.get_passage("TOB", 1, 1, 2, 3)
 
     assert client.references[0] == "TOB 1"
+
+
+# ── ESV query format ──────────────────────────────────────────────────────
+
+
+class StubEsv:
+    """Records Crossway query strings; returns empty HTML so the parser is idle."""
+
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    async def passage_html(self, query: str) -> str:
+        self.queries.append(query)
+        return ""
+
+
+@pytest.mark.asyncio
+async def test_esv_open_chapters_use_the_999_sentinel():
+    """Crossway wants an explicit end; 999 means 'to the end of the chapter'.
+
+    The opposite of bible-api.com, which 404s on a verse the chapter does not
+    have. Copying that close-on-canon behaviour here would be a silent miss.
+    """
+    client = StubEsv()
+    provider = EsvProvider(client)  # type: ignore[arg-type]
+
+    await provider.get_passage("JHN", 1, 1, 3, 4)
+
+    assert client.queries == ["John 1:1-1:999", "John 2:1-2:999", "John 3:1-3:4"]

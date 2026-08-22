@@ -81,6 +81,18 @@ def test_helloao_trims_to_the_requested_range():
     assert kept == "verse 2. verse 3. verse 4."
 
 
+def test_helloao_heading_precedes_its_verses():
+    content = [
+        {"type": "heading", "content": ["The Word Became Flesh"]},
+        {"type": "verse", "number": 1, "content": ["In the beginning."]},
+    ]
+    paragraphs = _parse_chapter(content, first=None, last=None)
+    assert [(p.kind, p.heading) for p in paragraphs] == [
+        ("heading", "The Word Became Flesh"),
+        ("text", ""),
+    ]
+
+
 def test_helloao_poetry_becomes_indented_paragraphs():
     content = [
         {

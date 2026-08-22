@@ -141,6 +141,25 @@ export function geometry(settings: Settings): Geometry {
   const available = page.height - 2 * MARGIN - FOOTER - NOTICE;
   const full = { x: MARGIN, y: MARGIN, width: inner, height: available };
 
+  if (settings.lines === "none") {
+    // Text only: drop the writing area and let the passage use the sheet.
+    if (settings.layout === "twocol") {
+      const gutter = 22;
+      const column = Math.floor((inner - gutter) / 2);
+      return {
+        page,
+        available,
+        perPage: 2,
+        slots: [
+          { ...full, width: column },
+          { ...full, x: MARGIN + column + gutter, width: column },
+        ],
+        lineBoxes: [],
+      };
+    }
+    return { page, available, perPage: 1, slots: [full], lineBoxes: [] };
+  }
+
   switch (settings.layout) {
     case "right": {
       const gutter = 26;
@@ -234,6 +253,20 @@ export function geometry(settings: Settings): Geometry {
   }
 }
 
+/** One text slot covering every column, so a parallel pair can share the page. */
+export function singleTextGeometry(settings: Settings): Geometry {
+  const geo = geometry(settings);
+  const x = Math.min(...geo.slots.map((slot) => slot.x));
+  const y = Math.min(...geo.slots.map((slot) => slot.y));
+  const right = Math.max(...geo.slots.map((slot) => slot.x + slot.width));
+  const bottom = Math.max(...geo.slots.map((slot) => slot.y + slot.height));
+  return {
+    ...geo,
+    perPage: 1,
+    slots: [{ x, y, width: right - x, height: bottom - y }],
+  };
+}
+
 export const rulePitch = (settings: Settings) =>
   Math.max(20, Math.round(settings.size * 1.333 * settings.lead));
 
@@ -251,7 +284,9 @@ const RULE_OFFSET = 6;
  * stays vector all the way into the PDF.
  */
 function writingAreaSvg(width: number, height: number, settings: Settings) {
-  if (settings.lines === "blank" || width <= 0 || height <= 0) return "";
+  if (settings.lines === "blank" || settings.lines === "none" || width <= 0 || height <= 0) {
+    return "";
+  }
   const pitch = rulePitch(settings);
 
   if (settings.lines === "dots") {
@@ -305,6 +340,8 @@ export interface PageOptions {
   /** The publishers' full notices. Printed once, on the final sheet. */
   copyright: string;
   settings: Settings;
+  /** When set, used instead of `geometry(settings)` so pagination and paint agree. */
+  layout?: Geometry;
 }
 
 /**
@@ -361,8 +398,9 @@ export function pageHtml({
   sources,
   copyright,
   settings,
+  layout,
 }: PageOptions) {
-  const geo = geometry(settings);
+  const geo = layout ?? geometry(settings);
   const footer = footerHtml({
     pageNumber,
     total,

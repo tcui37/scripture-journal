@@ -55,8 +55,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const {
     languages,
-    language,
-    setLanguage,
+    selectedLanguages,
+    addLanguage,
+    removeLanguage,
     bibles,
     books,
     book,
@@ -70,15 +71,30 @@ export default function Sidebar({
 
   const chapters = book?.chapters ?? [];
   const comparable = bibles.filter((entry) => entry.id !== reference.bibleId);
+  const multilingual = selectedLanguages.length > 1;
+  const selectedLanguageSet = new Set(selectedLanguages);
+
+  const withLanguage = (bible: (typeof bibles)[number]) =>
+    multilingual ? `${bible.label} · ${bible.language_name}` : bible.label;
 
   const translationOptions = bibles.map((bible) => ({
     id: bible.id,
-    label: bible.label,
+    label: withLanguage(bible),
   }));
+  const languageOptions = languages
+    .filter((entry) => !selectedLanguageSet.has(entry.code))
+    .map((entry) => ({
+      id: entry.code,
+      label: `${entry.name} (${entry.count})`,
+    }));
+  const selectedLanguageChips = selectedLanguages.map((code) => {
+    const entry = languages.find((language) => language.code === code);
+    return { code, name: entry?.name ?? code };
+  });
   // "None" is a normal option so it stays searchable and keyboard-reachable.
   const compareOptions = [
     { id: "", label: "None — single translation" },
-    ...comparable.map((bible) => ({ id: bible.id, label: bible.label })),
+    ...comparable.map((bible) => ({ id: bible.id, label: withLanguage(bible) })),
   ];
 
   return (
@@ -99,16 +115,38 @@ export default function Sidebar({
           open={openSections.passage ?? true}
           onToggle={(open) => onToggleSection("passage", open)}
         >
-          <label className="control">
-            <span className="control-label">Language</span>
-            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-              {languages.map((entry) => (
-                <option key={entry.code} value={entry.code}>
-                  {entry.name} ({entry.count})
-                </option>
+          <div className="control">
+            <div className="control-label">
+              Languages
+              <span className="control-value">{selectedLanguages.length || ""}</span>
+            </div>
+            <div className="chip-row">
+              {selectedLanguageChips.map((chip) => (
+                <span key={chip.code} className="chip">
+                  {chip.name}
+                  {selectedLanguages.length > 1 ? (
+                    <button
+                      type="button"
+                      className="chip-remove"
+                      aria-label={`Remove ${chip.name}`}
+                      onClick={() => removeLanguage(chip.code)}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </span>
               ))}
-            </select>
-          </label>
+            </div>
+            {languageOptions.length ? (
+              <Combobox
+                label="Add a language"
+                options={languageOptions}
+                value=""
+                onChange={addLanguage}
+                placeholder="Add a language…"
+              />
+            ) : null}
+          </div>
 
           <div className="control">
             <div className="control-label">
@@ -267,7 +305,7 @@ export default function Sidebar({
             options={LINE_OPTIONS}
             value={settings.lines}
             onChange={(lines) => onSettingsChange({ lines })}
-            variant="grid-3"
+            variant="grid-2"
           />
           <OptionGroup
             title="Paper colour"

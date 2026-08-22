@@ -62,7 +62,7 @@ export interface Passage {
 }
 
 export type Layout = "right" | "bottom" | "twocol" | "verso" | "wide";
-export type LineStyle = "ruled" | "dots" | "blank";
+export type LineStyle = "ruled" | "dots" | "blank" | "none";
 export type FontChoice = "serif" | "sans";
 export type NumberStyle = "sup" | "inline";
 export type Flow = "para" | "line";
@@ -70,7 +70,7 @@ export type Paper = "Ivory" | "Bright white" | "Warm grey";
 export type PageSize = "A4" | "Letter";
 export type Orientation = "portrait" | "landscape";
 /** How a second translation is arranged against the first. */
-export type ParallelMode = "columns" | "stacked" | "facing";
+export type ParallelMode = "columns" | "flow" | "stacked" | "bands" | "facing";
 
 /** Everything that affects how a page is drawn. */
 export interface Settings {

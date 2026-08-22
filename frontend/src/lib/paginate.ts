@@ -45,6 +45,7 @@ export function paginate(
   blocks: Block[],
   settings: Settings,
   measurer: Measurer,
+  slot?: { width: number; height: number },
 ): string[][] {
   const geo = geometry(settings);
   const slots: string[] = [];
@@ -52,14 +53,19 @@ export function paginate(
   let slotIndex = 0;
   let current = "";
   let currentHeight = 0;
-  let slotHeight = geo.slots[0].height;
-  let slotWidth = geo.slots[0].width;
+  let slotHeight = slot?.height ?? geo.slots[0].height;
+  let slotWidth = slot?.width ?? geo.slots[0].width;
 
   const nextSlot = () => {
     slots.push(current);
     current = "";
     currentHeight = 0;
     slotIndex += 1;
+    if (slot) {
+      slotHeight = slot.height;
+      slotWidth = slot.width;
+      return;
+    }
     const box = geo.slots[slotIndex % geo.slots.length];
     slotHeight = box.height;
     slotWidth = box.width;
@@ -118,9 +124,10 @@ export function paginate(
   if (current.trim()) slots.push(current);
   if (!slots.length) slots.push("");
 
+  const perPage = slot ? 1 : geo.perPage;
   const pages: string[][] = [];
-  for (let i = 0; i < slots.length; i += geo.perPage) {
-    pages.push(slots.slice(i, i + geo.perPage));
+  for (let i = 0; i < slots.length; i += perPage) {
+    pages.push(slots.slice(i, i + perPage));
   }
   return pages;
 }

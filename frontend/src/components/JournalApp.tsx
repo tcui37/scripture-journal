@@ -2,13 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useScripture } from "@/hooks/useScripture";
-import { paragraphBlocks, parallelBlocks } from "@/lib/blocks";
+import { uniqueLanguages, useScripture } from "@/hooks/useScripture";
+import {
+  combineParallelBands,
+  combineParallelColumns,
+  paragraphBlocks,
+  PARALLEL_GAP,
+  parallelBlocks,
+} from "@/lib/blocks";
 import { DEFAULT_REFERENCE, DEFAULT_SETTINGS, STORAGE_KEY, ZOOM_OPTIONS } from "@/lib/constants";
 import { checkLimits } from "@/lib/limits";
 import { Measurer, paginate } from "@/lib/paginate";
 import { alignPassages } from "@/lib/parallel";
-import { pageDimensions } from "@/lib/render";
+import { pageDimensions, singleTextGeometry } from "@/lib/render";
 import type { Reference, Settings } from "@/lib/types";
 
 import PageStack from "./PageStack";
@@ -27,12 +33,15 @@ export default function JournalApp() {
   const [hydrated, setHydrated] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const [initial, setInitial] = useState<{ reference: Reference; language: string }>({
+  const [initial, setInitial] = useState<{
+    reference: Reference;
+    languages: string[];
+  }>({
     reference: DEFAULT_REFERENCE,
-    language: "eng",
+    languages: ["eng"],
   });
 
-  const scripture = useScripture(initial.reference, initial.language, hydrated);
+  const scripture = useScripture(initial.reference, initial.languages, hydrated);
   const { reference, passage, comparePassage, status, failed } = scripture;
 
   /* ── persistence ─────────────────────────────────────────────────────── */
@@ -46,12 +55,17 @@ export default function JournalApp() {
           reference?: Partial<Reference>;
           openSections?: Record<string, boolean>;
           language?: string;
+          languages?: string[];
+          compareLanguage?: string;
         };
         if (parsed.settings) setSettings((prev) => ({ ...prev, ...parsed.settings }));
         if (parsed.openSections) setOpenSections(parsed.openSections);
         setInitial({
           reference: { ...DEFAULT_REFERENCE, ...parsed.reference },
-          language: parsed.language ?? "eng",
+          languages: uniqueLanguages(
+            parsed.languages ??
+              ([parsed.language, parsed.compareLanguage].filter(Boolean) as string[]),
+          ),
         });
       }
     } catch {
@@ -65,12 +79,17 @@ export default function JournalApp() {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ settings, reference, openSections, language: scripture.language }),
+        JSON.stringify({
+          settings,
+          reference,
+          openSections,
+          languages: scripture.selectedLanguages,
+        }),
       );
     } catch {
       // Storage may be full or blocked; the app still works without it.
     }
-  }, [hydrated, settings, reference, openSections, scripture.language]);
+  }, [hydrated, settings, reference, openSections, scripture.selectedLanguages]);
 
   /* ── pagination ──────────────────────────────────────────────────────── */
 
@@ -124,6 +143,46 @@ export default function JournalApp() {
         merged.push(right[i] ?? [""]);
       }
       return merged;
+    }
+
+    if (settings.parallelMode === "flow" || settings.parallelMode === "bands") {
+      // Independent pagination: each language keeps its own paragraphs, then
+      // the two are placed on one sheet (JPS / CUV–NIV columns, or a
+      // horizontal split when columns would be too narrow).
+      const region = singleTextGeometry(settings).slots[0];
+      const flow = settings.parallelMode === "flow";
+      const box = flow
+        ? {
+            width: Math.max(1, Math.floor((region.width - PARALLEL_GAP) / 2)),
+            height: region.height,
+          }
+        : {
+            width: region.width,
+            height: Math.max(1, Math.floor((region.height - PARALLEL_GAP) / 2)),
+          };
+      const left = paginate(
+        paragraphBlocks(passage.paragraphs, settings),
+        settings,
+        measurer,
+        box,
+      );
+      const right = paginate(
+        paragraphBlocks(comparePassage!.paragraphs, settings),
+        settings,
+        measurer,
+        box,
+      );
+      const combined: string[][] = [];
+      for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+        const primary = left[i]?.[0] ?? "";
+        const secondary = right[i]?.[0] ?? "";
+        combined.push([
+          flow
+            ? combineParallelColumns(primary, secondary)
+            : combineParallelBands(primary, secondary),
+        ]);
+      }
+      return combined;
     }
 
     const rows = alignPassages(passage.paragraphs, comparePassage!.paragraphs);
@@ -237,7 +296,11 @@ export default function JournalApp() {
     return `${bookName} ${startChapter}:${startVerse}–${endChapter}:${endVerse}`;
   }, [bookName, reference]);
 
-  const blanks = settings.layout === "verso" && !facing;
+  const blanks = settings.layout === "verso" && !facing && settings.lines !== "none";
+  const pageLayout =
+    parallel && (settings.parallelMode === "flow" || settings.parallelMode === "bands")
+      ? singleTextGeometry(settings)
+      : undefined;
   const pageCount = pages ? (blanks ? pages.length * 2 : pages.length) : 0;
   const chapterSpan = Number(reference.endChapter) - Number(reference.startChapter) + 1;
   const canPrint = Boolean(pages) && limitCheck.ok;
@@ -331,6 +394,7 @@ export default function JournalApp() {
               copyright={copyright}
               scale={scale}
               interleaveBlanks={blanks}
+              layout={pageLayout}
             />
           ) : null}
         </div>

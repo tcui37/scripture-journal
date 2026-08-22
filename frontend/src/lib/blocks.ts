@@ -6,6 +6,7 @@
  * possible, split. Both passage shapes are expressed as `Block`s here.
  */
 
+import { HAIRLINE } from "./constants";
 import { chapterHtml, headingHtml, paragraphHtml, typeCss, verseHtml } from "./render";
 import type { AlignedRow } from "./parallel";
 import type { Paragraph, Settings } from "./types";
@@ -19,7 +20,29 @@ export interface Block {
   keepWithNext?: boolean;
 }
 
-const PARALLEL_GAP = 18;
+export const PARALLEL_GAP = 18;
+
+/** Side-by-side translations that paginate independently, with a column rule. */
+export function combineParallelColumns(primary: string, secondary: string) {
+  const pad = Math.round(PARALLEL_GAP / 2);
+  return (
+    `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:${PARALLEL_GAP}px;align-items:start">` +
+    `<div style="padding:0 ${pad}px 0 ${pad}px;border-right:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
+    `<div style="padding:0 0 0 ${pad}px">${secondary || "&nbsp;"}</div>` +
+    `</div>`
+  );
+}
+
+/** Horizontal split: primary on the top half, secondary beneath. */
+export function combineParallelBands(primary: string, secondary: string) {
+  const pad = Math.round(PARALLEL_GAP / 2);
+  return (
+    `<div style="display:grid;grid-template-rows:1fr 1fr;row-gap:${PARALLEL_GAP}px">` +
+    `<div style="padding:0 0 ${pad}px 0;border-bottom:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
+    `<div style="padding:${pad}px 0 0">${secondary || "&nbsp;"}</div>` +
+    `</div>`
+  );
+}
 
 export function paragraphBlocks(paragraphs: Paragraph[], settings: Settings): Block[] {
   return paragraphs.map((paragraph) => {
@@ -68,11 +91,11 @@ export function parallelBlocks(rows: AlignedRow[], settings: Settings): Block[] 
       return [{ units: 1, render: () => html }];
     }
 
-    const cell = (html: string) => `<div style="${base}${align}">${html || "&nbsp;"}</div>`;
+    const pad = Math.round(PARALLEL_GAP / 2);
     const html =
-      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:${PARALLEL_GAP}px;margin:0 0 .45em">` +
-      cell(primary) +
-      cell(secondary) +
+      `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:${PARALLEL_GAP}px">` +
+      `<div style="${base}${align};padding:0 ${pad}px .45em ${pad}px;border-right:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
+      `<div style="${base}${align};padding:0 0 .45em ${pad}px">${secondary || "&nbsp;"}</div>` +
       `</div>`;
 
     return [{ units: 1, render: () => html }];

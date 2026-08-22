@@ -26,10 +26,36 @@ const isAbort = (error: unknown) =>
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "failed";
 
+/** First occurrence of each code, or English if the list is empty. */
+export const uniqueLanguages = (codes: string[]) => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const code of codes) {
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+  }
+  return out.length ? out : ["eng"];
+};
+
+function mergeBibles(lists: BibleSummary[][]) {
+  const byId = new Map<string, BibleSummary>();
+  const order: string[] = [];
+  for (const list of lists) {
+    for (const entry of list) {
+      if (byId.has(entry.id)) continue;
+      byId.set(entry.id, entry);
+      order.push(entry.id);
+    }
+  }
+  return order.map((id) => byId.get(id)!);
+}
+
 export interface Scripture {
   languages: LanguageSummary[];
-  language: string;
-  setLanguage: (code: string) => void;
+  selectedLanguages: string[];
+  addLanguage: (code: string) => void;
+  removeLanguage: (code: string) => void;
   bibles: BibleSummary[];
   books: Book[];
   book: Book | undefined;
@@ -52,12 +78,16 @@ export interface Scripture {
  */
 export function useScripture(
   initial: Reference,
-  initialLanguage: string,
+  initialLanguages: string[],
   ready: boolean,
 ): Scripture {
   const [languages, setLanguages] = useState<LanguageSummary[]>([]);
-  const [language, setLanguage] = useState(initialLanguage);
-  const [bibles, setBibles] = useState<BibleSummary[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState(() =>
+    uniqueLanguages(initialLanguages),
+  );
+  const [biblesByLanguage, setBiblesByLanguage] = useState<Record<string, BibleSummary[]>>(
+    {},
+  );
   const [books, setBooks] = useState<{ bibleId: string; list: Book[] }>({
     bibleId: "",
     list: [],
@@ -68,6 +98,15 @@ export function useScripture(
   const [reference, setReferenceState] = useState<Reference>(initial);
   const [status, setStatus] = useState("Loading…");
   const [failed, setFailed] = useState(false);
+
+  // localStorage is read after mount; apply it once before any translation fetch.
+  useEffect(() => {
+    if (!ready) return;
+    setSelectedLanguages(uniqueLanguages(initialLanguages));
+    setReferenceState(initial);
+    // Intentionally once, when the parent has finished reading storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   // Set when a change should pull the end verse to the end of its chapter,
   // which we can only do once that chapter's verse list has arrived.
@@ -103,11 +142,39 @@ export function useScripture(
     return () => controller.abort();
   }, [fail]);
 
+  const selectedKey = selectedLanguages.join(",");
+
   useEffect(() => {
+    if (!ready) return;
+    const missing = selectedLanguages.filter((code) => !(code in biblesByLanguage));
+    if (!missing.length) return;
+
     const controller = new AbortController();
-    fetchBibles(language, controller.signal).then(setBibles).catch(fail("Versions failed"));
+    Promise.all(
+      missing.map((code) =>
+        fetchBibles(code, controller.signal).then((list) => [code, list] as const),
+      ),
+    )
+      .then((entries) =>
+        setBiblesByLanguage((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
+      )
+      .catch(fail("Versions failed"));
+
     return () => controller.abort();
-  }, [language, fail]);
+    // biblesByLanguage is read to skip cached languages; listing it would
+    // re-run after every successful fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, selectedKey, fail]);
+
+  const bibles = useMemo(
+    () =>
+      mergeBibles(
+        selectedLanguages
+          .map((code) => biblesByLanguage[code])
+          .filter((list): list is BibleSummary[] => Boolean(list)),
+      ),
+    [selectedLanguages, biblesByLanguage],
+  );
 
   /* ── structure ───────────────────────────────────────────────────────── */
 
@@ -310,25 +377,34 @@ export function useScripture(
     }));
   }, [book]);
 
-  // Switching language invalidates the current translation choice.
-  const changeLanguage = useCallback(
-    (code: string) => {
-      setLanguage(code);
-      setBibles([]);
-    },
-    [],
-  );
+  const addLanguage = useCallback((code: string) => {
+    setSelectedLanguages((prev) => uniqueLanguages([...prev, code]));
+  }, []);
+
+  const removeLanguage = useCallback((code: string) => {
+    setSelectedLanguages((prev) => uniqueLanguages(prev.filter((entry) => entry !== code)));
+  }, []);
 
   useEffect(() => {
     if (!bibles.length) return;
-    if (bibles.some((entry) => entry.id === reference.bibleId)) return;
-    setReferenceState((prev) => ({ ...prev, bibleId: bibles[0].id, compareId: "" }));
-  }, [bibles, reference.bibleId]);
+    setReferenceState((prev) => {
+      let { bibleId, compareId } = prev;
+      if (!bibles.some((entry) => entry.id === bibleId)) {
+        bibleId = bibles[0].id;
+      }
+      if (compareId && (compareId === bibleId || !bibles.some((entry) => entry.id === compareId))) {
+        compareId = "";
+      }
+      if (bibleId === prev.bibleId && compareId === prev.compareId) return prev;
+      return { ...prev, bibleId, compareId };
+    });
+  }, [bibles]);
 
   return {
     languages,
-    language,
-    setLanguage: changeLanguage,
+    selectedLanguages,
+    addLanguage,
+    removeLanguage,
     bibles,
     books: books.list,
     book,

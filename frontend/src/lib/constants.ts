@@ -74,13 +74,23 @@ export const ORIENTATION_OPTIONS = [
 export const PARALLEL_OPTIONS = [
   {
     id: "columns",
-    label: "Side by side",
-    hint: "Verse-aligned columns, as in a parallel Bible",
+    label: "Verse columns",
+    hint: "Same verse on one line — NIV/RVR and most parallel Bibles",
+  },
+  {
+    id: "flow",
+    label: "Flowing columns",
+    hint: "Each language keeps its paragraphs — JPS, CUV/NIV",
   },
   {
     id: "stacked",
     label: "Stacked",
-    hint: "Each verse, then its translation below",
+    hint: "Each verse, then its translation below — a diglot",
+  },
+  {
+    id: "bands",
+    label: "Above and below",
+    hint: "One language on the top half, the other beneath",
   },
   {
     id: "facing",
@@ -121,6 +131,7 @@ export const LINE_OPTIONS = [
   { id: "ruled", label: "Ruled lines" },
   { id: "dots", label: "Dot grid" },
   { id: "blank", label: "Blank" },
+  { id: "none", label: "None" },
 ] as const;
 
 export const FONT_OPTIONS = [

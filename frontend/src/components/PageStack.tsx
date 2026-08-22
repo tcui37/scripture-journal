@@ -1,5 +1,5 @@
 import { PAPER_COLORS } from "@/lib/constants";
-import { pageDimensions, pageHtml } from "@/lib/render";
+import { pageDimensions, pageHtml, type Geometry } from "@/lib/render";
 import type { Settings } from "@/lib/types";
 
 interface PageStackProps {
@@ -16,6 +16,8 @@ interface PageStackProps {
   scale: number;
   /** Insert a blank lined sheet after each page (the verso arrangement). */
   interleaveBlanks?: boolean;
+  /** Overrides sheet geometry when pagination used a different slot layout. */
+  layout?: Geometry;
 }
 
 export default function PageStack({
@@ -27,6 +29,7 @@ export default function PageStack({
   copyright,
   scale,
   interleaveBlanks = false,
+  layout,
 }: PageStackProps) {
   const total = interleaveBlanks ? pages.length * 2 : pages.length;
   const sheets: { key: string; html: string }[] = [];
@@ -44,6 +47,7 @@ export default function PageStack({
         sources,
         copyright,
         settings,
+        layout,
       }),
     });
 
@@ -60,6 +64,7 @@ export default function PageStack({
           sources,
           copyright,
           settings,
+          layout,
         }),
       });
     }
