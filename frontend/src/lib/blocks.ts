@@ -20,26 +20,27 @@ export interface Block {
   keepWithNext?: boolean;
 }
 
-export const PARALLEL_GAP = 18;
+/** Space from translation text to the parallel rule, each side. */
+const DIVIDER_INSET = 20;
+/** Total gutter reserved between the two translations (both insets). */
+export const PARALLEL_GAP = DIVIDER_INSET * 2;
 
 /** Side-by-side translations that paginate independently, with a column rule. */
 export function combineParallelColumns(primary: string, secondary: string) {
-  const pad = Math.round(PARALLEL_GAP / 2);
   return (
-    `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:${PARALLEL_GAP}px;align-items:start">` +
-    `<div style="padding:0 ${pad}px 0 ${pad}px;border-right:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
-    `<div style="padding:0 0 0 ${pad}px">${secondary || "&nbsp;"}</div>` +
+    `<div style="display:grid;grid-template-columns:1fr 1fr;align-items:start">` +
+    `<div style="padding:0 ${DIVIDER_INSET}px 0 0;border-right:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
+    `<div style="padding:0 0 0 ${DIVIDER_INSET}px">${secondary || "&nbsp;"}</div>` +
     `</div>`
   );
 }
 
 /** Horizontal split: primary on the top half, secondary beneath. */
 export function combineParallelBands(primary: string, secondary: string) {
-  const pad = Math.round(PARALLEL_GAP / 2);
   return (
-    `<div style="display:grid;grid-template-rows:1fr 1fr;row-gap:${PARALLEL_GAP}px">` +
-    `<div style="padding:0 0 ${pad}px 0;border-bottom:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
-    `<div style="padding:${pad}px 0 0">${secondary || "&nbsp;"}</div>` +
+    `<div style="display:grid;grid-template-rows:1fr 1fr">` +
+    `<div style="padding:0 0 ${DIVIDER_INSET}px 0;border-bottom:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
+    `<div style="padding:${DIVIDER_INSET}px 0 0">${secondary || "&nbsp;"}</div>` +
     `</div>`
   );
 }
@@ -84,18 +85,17 @@ export function parallelBlocks(rows: AlignedRow[], settings: Settings): Block[] 
       // below it — the diglot arrangement, which suits narrow columns and
       // dense scripts better than two columns do.
       const html =
-        `<div style="margin:0 0 .55em">` +
+        `<div style="margin:0 0 .5em">` +
         `<div style="${base}${align}">${primary}</div>` +
-        `<div style="${base}${align}opacity:.78;padding-left:1.1em">${secondary || "&nbsp;"}</div>` +
+        `<div style="${base}${align}opacity:.78;padding:.2em 0 0 ${DIVIDER_INSET}px">${secondary || "&nbsp;"}</div>` +
         `</div>`;
       return [{ units: 1, render: () => html }];
     }
 
-    const pad = Math.round(PARALLEL_GAP / 2);
     const html =
-      `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:${PARALLEL_GAP}px">` +
-      `<div style="${base}${align};padding:0 ${pad}px .45em ${pad}px;border-right:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
-      `<div style="${base}${align};padding:0 0 .45em ${pad}px">${secondary || "&nbsp;"}</div>` +
+      `<div style="display:grid;grid-template-columns:1fr 1fr">` +
+      `<div style="${base}${align};padding:0 ${DIVIDER_INSET}px .45em 0;border-right:1px solid ${HAIRLINE}">${primary || "&nbsp;"}</div>` +
+      `<div style="${base}${align};padding:0 0 .45em ${DIVIDER_INSET}px">${secondary || "&nbsp;"}</div>` +
       `</div>`;
 
     return [{ units: 1, render: () => html }];
