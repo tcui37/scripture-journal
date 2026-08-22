@@ -10,11 +10,13 @@ import {
   PAPER_OPTIONS,
   PARALLEL_OPTIONS,
   POETRY_INDENT_OPTIONS,
+  TEXT_SHARE_MAX,
+  TEXT_SHARE_MIN,
   TEXT_TOGGLES,
   parallelSideLabels,
 } from "@/lib/constants";
 import type { LimitCheck } from "@/lib/limits";
-import type { Settings } from "@/lib/types";
+import type { PageSize, Settings } from "@/lib/types";
 
 import Combobox from "./Combobox";
 import OptionGroup from "./OptionGroup";
@@ -40,9 +42,11 @@ interface SidebarProps {
   summary: string;
   copyright: string;
   openSections: Record<string, boolean>;
+  collapsed: boolean;
   limitCheck: LimitCheck;
   onSettingsChange: (patch: Partial<Settings>) => void;
   onToggleSection: (id: string, open: boolean) => void;
+  onToggle: () => void;
 }
 
 export default function Sidebar({
@@ -51,9 +55,11 @@ export default function Sidebar({
   summary,
   copyright,
   openSections,
+  collapsed,
   limitCheck,
   onSettingsChange,
   onToggleSection,
+  onToggle,
 }: SidebarProps) {
   const {
     languages,
@@ -102,13 +108,42 @@ export default function Sidebar({
   ];
 
   return (
-    <aside className="rail">
+    <aside
+      id="settings-rail"
+      className={`rail${collapsed ? " is-collapsed" : ""}`}
+      aria-hidden={collapsed || undefined}
+      inert={collapsed || undefined}
+    >
       <div className="rail-header">
-        <h1 className="rail-title">
-          Scripture
-          <br />
-          Journal
-        </h1>
+        <div className="rail-heading">
+          <h1 className="rail-title">
+            Scripture
+            <br />
+            Journal
+          </h1>
+          <button
+            type="button"
+            className="rail-toggle"
+            aria-expanded={!collapsed}
+            aria-controls="settings-rail"
+            aria-label="Hide settings"
+            onClick={onToggle}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        </div>
         <div className="rail-tagline">A passage, a wide margin, room to write.</div>
       </div>
 
@@ -322,12 +357,23 @@ export default function Sidebar({
             />
           ) : null}
 
-          <OptionGroup
-            title="Paper size"
-            options={PAGE_SIZE_OPTIONS}
-            value={settings.pageSize}
-            onChange={(pageSize) => onSettingsChange({ pageSize })}
-          />
+          <label className="control">
+            <span className="control-label">Paper size</span>
+            <select
+              value={settings.pageSize}
+              onChange={(event) => onSettingsChange({ pageSize: event.target.value as PageSize })}
+            >
+              {[...new Set(PAGE_SIZE_OPTIONS.map((option) => option.group))].map((group) => (
+                <optgroup key={group} label={group}>
+                  {PAGE_SIZE_OPTIONS.filter((option) => option.group === group).map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
           <OptionGroup
             title="Orientation"
             options={ORIENTATION_OPTIONS}
@@ -363,6 +409,30 @@ export default function Sidebar({
                 </label>
               </div>
             </div>
+          ) : null}
+          {settings.lines !== "none" &&
+          (settings.layout === "right" ||
+            settings.layout === "bottom" ||
+            settings.layout === "twocol" ||
+            settings.layout === "wide") ? (
+            <label className="control">
+              <span className="control-label">
+                Text and writing{" "}
+                <span className="control-value">
+                  {Math.round(settings.textShare * 100)}% text
+                </span>
+              </span>
+              <input
+                type="range"
+                min={TEXT_SHARE_MIN}
+                max={TEXT_SHARE_MAX}
+                step={0.01}
+                value={settings.textShare}
+                onChange={(event) =>
+                  onSettingsChange({ textShare: Number(event.target.value) })
+                }
+              />
+            </label>
           ) : null}
           <OptionGroup
             title="Paper colour"

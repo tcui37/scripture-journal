@@ -7,6 +7,7 @@
  */
 
 import {
+  DEFAULT_TEXT_SHARE,
   FOOTER,
   HAIRLINE,
   INK,
@@ -15,6 +16,8 @@ import {
   NOTICE,
   PAGE_SIZES,
   RULE,
+  TEXT_SHARE_MAX,
+  TEXT_SHARE_MIN,
   WORDS_OF_CHRIST,
 } from "./constants";
 import type { Paragraph, PoetryIndent, Settings, Verse } from "./types";
@@ -131,12 +134,23 @@ export interface Geometry {
   perPage: number;
 }
 
-// Proportions of the inner width, measured from the original A4 design so
-// every layout keeps its look on Letter and in landscape.
+// Classic proportions at the default textShare, measured from the original
+// A4 design so every layout keeps its look on Letter and in landscape.
 const TEXT_FRACTION_RIGHT = 0.5714;
 const MARGIN_FRACTION_TWOCOL = 0.2653;
 const CENTRE_FRACTION_WIDE = 0.5073;
 const TEXT_FRACTION_BOTTOM = 0.54;
+
+function clampedTextShare(settings: Settings): number {
+  const value = settings.textShare;
+  if (typeof value !== "number" || Number.isNaN(value)) return DEFAULT_TEXT_SHARE;
+  return Math.min(TEXT_SHARE_MAX, Math.max(TEXT_SHARE_MIN, value));
+}
+
+/** Scale a layout's classic fraction so the default textShare keeps today's look. */
+function splitFraction(share: number, classic: number): number {
+  return classic * (share / DEFAULT_TEXT_SHARE);
+}
 
 /** Where text and writing areas sit on a page, for the current settings. */
 export function geometry(settings: Settings): Geometry {
@@ -170,7 +184,8 @@ export function geometry(settings: Settings): Geometry {
   switch (settings.layout) {
     case "right": {
       const gutter = 26;
-      const textWidth = Math.round(inner * TEXT_FRACTION_RIGHT);
+      const share = clampedTextShare(settings);
+      const textWidth = Math.round(inner * splitFraction(share, TEXT_FRACTION_RIGHT));
       return {
         page,
         available,
@@ -190,7 +205,8 @@ export function geometry(settings: Settings): Geometry {
 
     case "bottom": {
       const gap = 22;
-      const textHeight = Math.round(available * TEXT_FRACTION_BOTTOM);
+      const share = clampedTextShare(settings);
+      const textHeight = Math.round(available * splitFraction(share, TEXT_FRACTION_BOTTOM));
       return {
         page,
         available,
@@ -211,7 +227,10 @@ export function geometry(settings: Settings): Geometry {
     case "twocol": {
       const gutter = 22;
       const rule = 26;
-      const marginWidth = Math.round(inner * MARGIN_FRACTION_TWOCOL);
+      const share = clampedTextShare(settings);
+      const marginWidth = Math.round(
+        inner * MARGIN_FRACTION_TWOCOL * ((1 - share) / (1 - DEFAULT_TEXT_SHARE)),
+      );
       const column = Math.floor((inner - marginWidth - rule - gutter) / 2);
       return {
         page,
@@ -239,7 +258,8 @@ export function geometry(settings: Settings): Geometry {
 
     default: {
       const gap = 22;
-      const centre = Math.round(inner * CENTRE_FRACTION_WIDE);
+      const share = clampedTextShare(settings);
+      const centre = Math.round(inner * splitFraction(share, CENTRE_FRACTION_WIDE));
       const side = Math.round((inner - centre - gap * 2) / 2);
       return {
         page,

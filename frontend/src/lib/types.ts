@@ -69,7 +69,19 @@ export type Flow = "para" | "line";
 /** Hanging indent for USFM poetry lines (q / q2). */
 export type PoetryIndent = "off" | "regular" | "deep";
 export type Paper = "Ivory" | "Bright white" | "Warm grey";
-export type PageSize = "A4" | "Letter";
+export type PageSize =
+  | "A3"
+  | "A4"
+  | "A5"
+  | "A6"
+  | "B5"
+  | "B6"
+  | "Letter"
+  | "Half letter"
+  | "Legal"
+  | "Tabloid"
+  | "Executive"
+  | "6 × 9 in";
 export type Orientation = "portrait" | "landscape";
 /** How a second translation is arranged against the first. */
 export type ParallelMode = "columns" | "flow" | "stacked" | "bands" | "facing";
@@ -97,6 +109,8 @@ export interface Settings {
   parallelSwap: boolean;
   /** Date and title rules at the top of each writing area. */
   titleLine: boolean;
+  /** Fraction of the inner area given to scripture text; the rest is writing. */
+  textShare: number;
 }
 
 /**

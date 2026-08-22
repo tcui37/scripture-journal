@@ -69,15 +69,69 @@ button {
   width: 352px;
   flex: none;
   height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
   background: var(--color-neutral-100);
   border-right: 1px solid var(--color-divider);
   display: flex;
   flex-direction: column;
+  transition: width 0.2s ease;
+}
+
+.rail.is-collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-right-width: 0;
+}
+
+.rail-header,
+.rail-body,
+.rail-footer {
+  min-width: 351px;
 }
 
 .rail-header {
   padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+.rail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.rail-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+}
+
+.rail-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.rail-toggle.is-label {
+  width: auto;
+  height: auto;
+  margin-top: 0;
+  padding: 6px 12px 6px 10px;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-neutral-600);
 }
 
 .rail-title {
@@ -596,6 +650,10 @@ button {
   align-items: baseline;
   gap: 14px;
   min-width: 0;
+}
+
+.topbar-left .rail-toggle {
+  align-self: center;
 }
 
 .topbar-status {

@@ -11,7 +11,13 @@ import {
   PARALLEL_GAP,
   parallelBlocks,
 } from "@/lib/blocks";
-import { DEFAULT_REFERENCE, DEFAULT_SETTINGS, STORAGE_KEY, ZOOM_OPTIONS } from "@/lib/constants";
+import {
+  cssPageSize,
+  DEFAULT_REFERENCE,
+  DEFAULT_SETTINGS,
+  STORAGE_KEY,
+  ZOOM_OPTIONS,
+} from "@/lib/constants";
 import { printFilename } from "@/lib/filename";
 import { checkLimits } from "@/lib/limits";
 import { Measurer, paginate } from "@/lib/paginate";
@@ -37,6 +43,7 @@ export default function JournalApp() {
   const [hydrated, setHydrated] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const [initial, setInitial] = useState<{
     reference: Reference;
     languages: string[];
@@ -58,12 +65,14 @@ export default function JournalApp() {
           settings?: Partial<Settings>;
           reference?: Partial<Reference>;
           openSections?: Record<string, boolean>;
+          railCollapsed?: boolean;
           language?: string;
           languages?: string[];
           compareLanguage?: string;
         };
         if (parsed.settings) setSettings((prev) => ({ ...prev, ...parsed.settings }));
         if (parsed.openSections) setOpenSections(parsed.openSections);
+        if (typeof parsed.railCollapsed === "boolean") setRailCollapsed(parsed.railCollapsed);
         setInitial({
           reference: { ...DEFAULT_REFERENCE, ...parsed.reference },
           languages: uniqueLanguages(
@@ -87,13 +96,14 @@ export default function JournalApp() {
           settings,
           reference,
           openSections,
+          railCollapsed,
           languages: scripture.selectedLanguages,
         }),
       );
     } catch {
       // Storage may be full or blocked; the app still works without it.
     }
-  }, [hydrated, settings, reference, openSections, scripture.selectedLanguages]);
+  }, [hydrated, settings, reference, openSections, railCollapsed, scripture.selectedLanguages]);
 
   /* ── pagination ──────────────────────────────────────────────────────── */
 
@@ -237,6 +247,8 @@ export default function JournalApp() {
     [],
   );
 
+  const handleToggleRail = useCallback(() => setRailCollapsed((prev) => !prev), []);
+
   /* ── derived ─────────────────────────────────────────────────────────── */
 
   const bookName = scripture.book?.name;
@@ -340,7 +352,7 @@ export default function JournalApp() {
   return (
     <div className="app">
       {/* @page can't read CSS variables, so the rule is generated per setting. */}
-      <style>{`@page { size: ${settings.pageSize === "Letter" ? "letter" : "A4"} ${settings.orientation}; margin: 0; }`}</style>
+      <style>{`@page { size: ${cssPageSize(settings.pageSize)} ${settings.orientation}; margin: 0; }`}</style>
 
       <Sidebar
         scripture={scripture}
@@ -348,14 +360,41 @@ export default function JournalApp() {
         summary={summary}
         copyright={notice}
         openSections={openSections}
+        collapsed={railCollapsed}
         limitCheck={limitCheck}
         onSettingsChange={handleSettingsChange}
         onToggleSection={handleToggleSection}
+        onToggle={handleToggleRail}
       />
 
       <main className="desk" ref={deskRef}>
         <div className="topbar">
           <div className="topbar-left">
+            {railCollapsed ? (
+              <button
+                type="button"
+                className="rail-toggle is-label"
+                aria-expanded={false}
+                aria-controls="settings-rail"
+                aria-label="Show settings"
+                onClick={handleToggleRail}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+                Show settings
+              </button>
+            ) : null}
             <div className="topbar-reference">{referenceLabel}</div>
             <div className={`topbar-status${failed ? " is-error" : ""}`}>{statusText}</div>
           </div>
