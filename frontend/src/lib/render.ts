@@ -12,16 +12,34 @@ import {
   INK,
   MARGIN,
   MUTED,
+  NOTICE,
   PAGE_SIZES,
   RULE,
   WORDS_OF_CHRIST,
 } from "./constants";
 import type { Paragraph, Settings, Verse } from "./types";
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const SANS = "var(--font-body), system-ui, sans-serif";
+
+/**
+ * Section heading and chapter marker, shared by the flowing and parallel
+ * layouts so the two cannot drift apart. Both return "" when the
+ * corresponding setting is off, which callers treat as "emit nothing".
+ */
+export function headingHtml(text: string, settings: Settings) {
+  if (!settings.showHeadings || !text) return "";
+  const size = (settings.size * 0.84).toFixed(1);
+  return `<div style="font-family:${SANS};font-size:${size}pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${MUTED};margin:1.15em 0 .5em">${escapeHtml(text)}</div>`;
+}
+
+export function chapterHtml(number: string, settings: Settings) {
+  if (!settings.showChapterNumbers || !number) return "";
+  const size = (settings.size * 0.95).toFixed(1);
+  return `<div style="font-family:${SANS};font-size:${size}pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${INK};margin:1.6em 0 .6em">Chapter ${escapeHtml(number)}</div>`;
+}
 
 /** Sheet size in CSS pixels, with orientation applied. */
 export function pageDimensions(settings: Settings) {
@@ -31,13 +49,13 @@ export function pageDimensions(settings: Settings) {
     : { width, height };
 }
 
-function typeCss(settings: Settings) {
+export function typeCss(settings: Settings) {
   const family =
     settings.font === "serif" ? "var(--font-serif), Georgia, serif" : SANS;
   return `font-family:${family};font-size:${settings.size}pt;line-height:${settings.lead};color:${INK};text-wrap:pretty;`;
 }
 
-function verseHtml(verse: Verse, settings: Settings) {
+export function verseHtml(verse: Verse, settings: Settings) {
   let html = "";
 
   if (verse.number) {
@@ -59,21 +77,11 @@ function verseHtml(verse: Verse, settings: Settings) {
   return html;
 }
 
-/** `upto` renders only the first N verses, used to find a page break. */
-export function paragraphHtml(paragraph: Paragraph, settings: Settings, upto?: number) {
-  if (paragraph.kind === "chapter") {
-    if (!settings.showChapterNumbers) return "";
-    const size = (settings.size * 0.95).toFixed(1);
-    return `<div style="font-family:${SANS};font-size:${size}pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${INK};margin:1.6em 0 .6em">Chapter ${escapeHtml(paragraph.heading)}</div>`;
-  }
+export function paragraphHtml(paragraph: Paragraph, settings: Settings) {
+  if (paragraph.kind === "chapter") return chapterHtml(paragraph.heading, settings);
+  if (paragraph.kind === "heading") return headingHtml(paragraph.heading, settings);
 
-  if (paragraph.kind === "heading") {
-    if (!settings.showHeadings) return "";
-    const size = (settings.size * 0.84).toFixed(1);
-    return `<div style="font-family:${SANS};font-size:${size}pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${MUTED};margin:1.15em 0 .5em">${escapeHtml(paragraph.heading)}</div>`;
-  }
-
-  const verses = upto == null ? paragraph.verses : paragraph.verses.slice(0, upto);
+  const verses = paragraph.verses;
   const align = settings.justify ? "text-align:justify;hyphens:auto" : "text-align:left";
   // q1/q2 are poetry lines; indent them the way a print Bible would.
   const indent = /^q2/.test(paragraph.style) ? "2.2em" : /^q/.test(paragraph.style) ? "1.2em" : "0";
@@ -127,7 +135,10 @@ const TEXT_FRACTION_BOTTOM = 0.54;
 export function geometry(settings: Settings): Geometry {
   const page = pageDimensions(settings);
   const inner = page.width - 2 * MARGIN;
-  const available = page.height - 2 * MARGIN - (settings.pageNumbers ? FOOTER : 8);
+  // FOOTER and NOTICE are reserved on every sheet even though the copyright
+  // paragraph only prints on the last one: pagination uses a single slot
+  // height, so it has to clear the tallest footer any sheet will draw.
+  const available = page.height - 2 * MARGIN - FOOTER - NOTICE;
   const full = { x: MARGIN, y: MARGIN, width: inner, height: available };
 
   switch (settings.layout) {
@@ -287,7 +298,57 @@ export interface PageOptions {
   /** A facing page in the verso layout: writing area only. */
   blank: boolean;
   reference: string;
+  /** Translation abbreviation(s), e.g. "NIV" — the in-context citation. */
+  citation: string;
+  /** Short source links, e.g. "esv.org". Required on every page. */
+  sources: string;
+  /** The publishers' full notices. Printed once, on the final sheet. */
+  copyright: string;
   settings: Settings;
+}
+
+/**
+ * The foot of every sheet.
+ *
+ * Both keyed sources ask for two different things, at two different
+ * frequencies: the translation abbreviation and a link back on *every* page
+ * carrying their text, and the full copyright notice once on a "copyright
+ * page". So each sheet gets a single quiet line, and only the last one carries
+ * the paragraph — the minimum each licence actually asks for.
+ *
+ * The citation line rides along with the user's `pageNumbers` setting only for
+ * its page-number half; the abbreviation and links are a licence condition and
+ * are always drawn.
+ */
+function footerHtml({
+  pageNumber,
+  total,
+  reference,
+  citation,
+  sources,
+  copyright,
+  settings,
+}: Omit<PageOptions, "slots" | "blank">) {
+  const band = `position:absolute;left:${MARGIN}px;right:${MARGIN}px;font-family:${SANS};color:${MUTED};`;
+  const out: string[] = [];
+  const lastPage = pageNumber >= total;
+
+  const left = citation ? `${reference} (${citation})` : reference;
+  const right = [sources, settings.pageNumbers ? `${pageNumber} / ${total}` : ""]
+    .filter(Boolean)
+    .join("   ·   ");
+
+  out.push(
+    `<div style="${band}bottom:${Math.round(MARGIN * 0.52) + (lastPage && copyright ? NOTICE : 0)}px;display:flex;justify-content:space-between;gap:16px;font-size:7.5pt;letter-spacing:.05em"><span>${escapeHtml(left)}</span><span style="white-space:nowrap">${escapeHtml(right)}</span></div>`,
+  );
+
+  if (lastPage && copyright) {
+    out.push(
+      `<div style="${band}bottom:14px;font-size:5.8pt;line-height:1.3;max-height:${NOTICE}px;overflow:hidden">${escapeHtml(copyright)}</div>`,
+    );
+  }
+
+  return out.join("");
 }
 
 export function pageHtml({
@@ -296,13 +357,21 @@ export function pageHtml({
   total,
   blank,
   reference,
+  citation,
+  sources,
+  copyright,
   settings,
 }: PageOptions) {
   const geo = geometry(settings);
-
-  const footer = settings.pageNumbers
-    ? `<div style="position:absolute;left:${MARGIN}px;right:${MARGIN}px;bottom:${Math.round(MARGIN * 0.52)}px;display:flex;justify-content:space-between;font-family:${SANS};font-size:8pt;letter-spacing:.06em;color:${MUTED}"><span>${escapeHtml(reference)}</span><span>${pageNumber} / ${total}</span></div>`
-    : "";
+  const footer = footerHtml({
+    pageNumber,
+    total,
+    reference,
+    citation,
+    sources,
+    copyright,
+    settings,
+  });
 
   if (blank) {
     const full: Box = {

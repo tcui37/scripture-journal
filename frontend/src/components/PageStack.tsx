@@ -7,12 +7,28 @@ interface PageStackProps {
   pages: string[][];
   settings: Settings;
   reference: string;
+  /** Translation abbreviation(s) printed beside the reference. */
+  citation: string;
+  /** Short source links, on every sheet. */
+  sources: string;
+  /** Full publisher notices, printed once on the final sheet. */
+  copyright: string;
   scale: number;
+  /** Insert a blank lined sheet after each page (the verso arrangement). */
+  interleaveBlanks?: boolean;
 }
 
-export default function PageStack({ pages, settings, reference, scale }: PageStackProps) {
-  // The "verso" layout interleaves a blank lined page after every text page.
-  const total = settings.layout === "verso" ? pages.length * 2 : pages.length;
+export default function PageStack({
+  pages,
+  settings,
+  reference,
+  citation,
+  sources,
+  copyright,
+  scale,
+  interleaveBlanks = false,
+}: PageStackProps) {
+  const total = interleaveBlanks ? pages.length * 2 : pages.length;
   const sheets: { key: string; html: string }[] = [];
 
   pages.forEach((slots, index) => {
@@ -24,11 +40,14 @@ export default function PageStack({ pages, settings, reference, scale }: PageSta
         total,
         blank: false,
         reference,
+        citation,
+        sources,
+        copyright,
         settings,
       }),
     });
 
-    if (settings.layout === "verso") {
+    if (interleaveBlanks) {
       sheets.push({
         key: `blank-${index}`,
         html: pageHtml({
@@ -37,6 +56,9 @@ export default function PageStack({ pages, settings, reference, scale }: PageSta
           total,
           blank: true,
           reference,
+          citation,
+          sources,
+          copyright,
           settings,
         }),
       });

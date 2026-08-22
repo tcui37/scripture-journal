@@ -1,12 +1,30 @@
 /** Mirrors the Pydantic models in backend/app/schemas.py. */
 
+export interface BibleLimits {
+  max_verses: number | null;
+  max_book_fraction: number | null;
+  exempt_single_chapter_books: boolean;
+  note: string;
+}
+
 export interface BibleSummary {
   id: string;
   label: string;
+  language: string;
+  language_name: string;
+  limits: BibleLimits | null;
+}
+
+export interface LanguageSummary {
+  code: string;
+  name: string;
+  count: number;
 }
 
 export interface Chapter {
   number: string;
+  /** Verses in this chapter; used to size a selection before requesting it. */
+  verse_count: number;
 }
 
 export interface Book {
@@ -36,7 +54,10 @@ export interface Paragraph {
 
 export interface Passage {
   reference: string;
+  /** The publisher's copyright notice for this translation. */
   copyright: string;
+  /** Provider attribution the licence requires on the page, if any. */
+  attribution: string;
   paragraphs: Paragraph[];
 }
 
@@ -48,12 +69,15 @@ export type Flow = "para" | "line";
 export type Paper = "Ivory" | "Bright white" | "Warm grey";
 export type PageSize = "A4" | "Letter";
 export type Orientation = "portrait" | "landscape";
+/** How a second translation is arranged against the first. */
+export type ParallelMode = "columns" | "stacked" | "facing";
 
 /** Everything that affects how a page is drawn. */
 export interface Settings {
   pageSize: PageSize;
   orientation: Orientation;
   layout: Layout;
+  parallelMode: ParallelMode;
   lines: LineStyle;
   font: FontChoice;
   size: number;
@@ -74,6 +98,8 @@ export interface Settings {
  */
 export interface Reference {
   bibleId: string;
+  /** Optional second translation, shown in a parallel column. */
+  compareId: string;
   bookId: string;
   startChapter: string;
   startVerse: string;

@@ -8,7 +8,7 @@ of runs that may be words-of-Christ or italic.
 import re
 from typing import Any
 
-from .schemas import Paragraph, Segment, Verse
+from ...schemas import Paragraph, Segment, Verse
 
 HEADING_STYLE = re.compile(r"^(s\d?|ms\d?|mr|r|d)$")
 ITALIC_STYLES = {"add", "qt"}

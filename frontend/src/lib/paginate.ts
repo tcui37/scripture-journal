@@ -1,14 +1,21 @@
 /**
- * Flows paragraphs into fixed-height page slots.
+ * Flows blocks into fixed-height page slots.
  *
- * There is no way to know how tall a paragraph renders without rendering it, so
- * this measures candidate markup in a hidden, off-screen div. When a paragraph
- * overflows the current slot it binary-searches for the largest number of
- * verses that still fit, splits there, and continues on the next slot.
+ * There is no way to know how tall a block renders without rendering it, so
+ * this measures candidate markup in a hidden, off-screen div. When a
+ * splittable block overflows the current slot it binary-searches for the
+ * largest number of units that still fit, splits there, and continues on the
+ * next slot.
  */
 
-import { geometry, paragraphHtml } from "./render";
-import type { Paragraph, Settings } from "./types";
+import type { Block } from "./blocks";
+import { geometry } from "./render";
+import type { Settings } from "./types";
+
+/** Minimum room a heading needs below it to avoid being stranded. */
+const ORPHAN_GUARD = 40;
+/** Below this, splitting a block is not worth the ragged result. */
+const MIN_SPLIT_ROOM = 64;
 
 export class Measurer {
   private element: HTMLDivElement;
@@ -35,7 +42,7 @@ export class Measurer {
 
 /** Returns one entry per page, each holding that page's slot markup. */
 export function paginate(
-  paragraphs: Paragraph[],
+  blocks: Block[],
   settings: Settings,
   measurer: Measurer,
 ): string[][] {
@@ -58,42 +65,32 @@ export function paginate(
     slotWidth = box.width;
   };
 
-  for (const paragraph of paragraphs) {
-    // Headings and chapter markers are indivisible blocks.
-    if (paragraph.kind !== "text") {
-      const html = paragraphHtml(paragraph, settings);
-      if (!html) continue;
+  for (const block of blocks) {
+    let offset = 0;
+
+    do {
+      const html = block.render(offset);
+      if (!html) break;
+
       const height = measurer.measure(html, slotWidth);
-      // Don't strand a heading at the foot of a slot with no text under it.
-      if (currentHeight + height > slotHeight - 40 && current) nextSlot();
-      current += html;
-      currentHeight += height;
-      continue;
-    }
+      const limit = block.keepWithNext ? slotHeight - ORPHAN_GUARD : slotHeight;
 
-    let rest = paragraph.verses;
-
-    while (rest.length) {
-      const chunk: Paragraph = { ...paragraph, verses: rest };
-      const html = paragraphHtml(chunk, settings);
-      const height = measurer.measure(html, slotWidth);
-
-      if (currentHeight + height <= slotHeight) {
+      if (currentHeight + height <= limit) {
         current += html;
         currentHeight += height;
         break;
       }
 
       const room = slotHeight - currentHeight;
+      const remaining = block.units - offset;
       let fits = 0;
 
-      // Only bother splitting if there is a usable amount of room left.
-      if (rest.length > 1 && room > 64) {
+      if (remaining > 1 && room > MIN_SPLIT_ROOM) {
         let low = 1;
-        let high = rest.length - 1;
+        let high = remaining - 1;
         while (low <= high) {
           const mid = (low + high) >> 1;
-          if (measurer.measure(paragraphHtml(chunk, settings, mid), slotWidth) <= room) {
+          if (measurer.measure(block.render(offset, offset + mid), slotWidth) <= room) {
             fits = mid;
             low = mid + 1;
           } else {
@@ -103,8 +100,8 @@ export function paginate(
       }
 
       if (fits > 0) {
-        current += paragraphHtml({ ...paragraph, verses: rest.slice(0, fits) }, settings);
-        rest = rest.slice(fits);
+        current += block.render(offset, offset + fits);
+        offset += fits;
         nextSlot();
       } else if (current) {
         // Nothing fits here, but the slot has content: start a fresh one.
@@ -115,7 +112,7 @@ export function paginate(
         currentHeight += height;
         break;
       }
-    }
+    } while (offset < block.units);
   }
 
   if (current.trim()) slots.push(current);

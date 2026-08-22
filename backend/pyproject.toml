@@ -1,0 +1,46 @@
+[project]
+name = "scripture-journal-api"
+version = "1.0.0"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
+
+[tool.ruff]
+line-length = 96
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # import order
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",
+]
+ignore = [
+    # The canon tables and the curated translation list read better as aligned
+    # columns than wrapped one entry per line.
+    "E501",
+    # Typographic characters are deliberate here: en dashes in verse ranges
+    # ("John 3:16–17") and curly quotes in the punctuation set that decides
+    # where a space belongs. They are the correct characters, not typos.
+    "RUF001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests reach into provider internals on purpose.
+"tests/*" = ["SLF001"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true

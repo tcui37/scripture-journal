@@ -9,6 +9,13 @@ export const PAGE_SIZES = {
 /** Print margin and footer strip, shared by every sheet size. */
 export const MARGIN = 54;
 export const FOOTER = 26;
+/**
+ * Room reserved at the foot of every sheet for the copyright and provider
+ * notices. Always reserved rather than measured, so turning the page footer on
+ * or off cannot reflow the text: the notices are a licence condition, not a
+ * user preference, and every source supplies at least a translation name.
+ */
+export const NOTICE = 26;
 
 export const INK = "#201e1d";
 export const MUTED = "#82796a";
@@ -23,12 +30,13 @@ export const PAPER_COLORS: Record<string, string> = {
 };
 
 /** Bumped when the stored shape changes, so old entries are ignored. */
-export const STORAGE_KEY = "scripture-journal-v2";
+export const STORAGE_KEY = "scripture-journal-v3";
 
 export const DEFAULT_SETTINGS: Settings = {
   pageSize: "A4",
   orientation: "portrait",
   layout: "right",
+  parallelMode: "columns",
   lines: "ruled",
   font: "serif",
   size: 12,
@@ -44,7 +52,8 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const DEFAULT_REFERENCE = {
-  bibleId: "78a9f6124f344018-01",
+  bibleId: "niv",
+  compareId: "",
   bookId: "JHN",
   startChapter: "1",
   startVerse: "1",
@@ -60,6 +69,24 @@ export const PAGE_SIZE_OPTIONS = [
 export const ORIENTATION_OPTIONS = [
   { id: "portrait", label: "Portrait" },
   { id: "landscape", label: "Landscape" },
+] as const;
+
+export const PARALLEL_OPTIONS = [
+  {
+    id: "columns",
+    label: "Side by side",
+    hint: "Verse-aligned columns, as in a parallel Bible",
+  },
+  {
+    id: "stacked",
+    label: "Stacked",
+    hint: "Each verse, then its translation below",
+  },
+  {
+    id: "facing",
+    label: "Facing pages",
+    hint: "One translation per sheet, print double-sided",
+  },
 ] as const;
 
 export const LAYOUT_OPTIONS = [

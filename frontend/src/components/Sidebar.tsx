@@ -1,3 +1,4 @@
+import type { Scripture } from "@/hooks/useScripture";
 import {
   FLOW_OPTIONS,
   FONT_OPTIONS,
@@ -7,47 +8,78 @@ import {
   ORIENTATION_OPTIONS,
   PAGE_SIZE_OPTIONS,
   PAPER_OPTIONS,
+  PARALLEL_OPTIONS,
   TEXT_TOGGLES,
 } from "@/lib/constants";
-import type { BibleSummary, Book, Reference, Settings } from "@/lib/types";
+import type { LimitCheck } from "@/lib/limits";
+import type { Settings } from "@/lib/types";
 
+import Combobox from "./Combobox";
 import OptionGroup from "./OptionGroup";
+import Section from "./Section";
 import ToggleList from "./ToggleList";
 
+/** Render a notice with its bare URLs as real links. */
+function linkify(text: string) {
+  return text.split(/(https?:\/\/[^\s,;)]+)/g).map((part, index) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={index} href={part} target="_blank" rel="noreferrer noopener">
+        {part.replace(/^https?:\/\//, "")}
+      </a>
+    ) : (
+      part
+    ),
+  );
+}
+
 interface SidebarProps {
-  bibles: BibleSummary[];
-  books: Book[];
-  startVerses: string[];
-  endVerses: string[];
-  reference: Reference;
+  scripture: Scripture;
   settings: Settings;
   summary: string;
   copyright: string;
-  canPrint: boolean;
-  onReferenceChange: (patch: Partial<Reference>) => void;
+  openSections: Record<string, boolean>;
+  limitCheck: LimitCheck;
   onSettingsChange: (patch: Partial<Settings>) => void;
-  onWholeChapter: () => void;
-  onEntireBook: () => void;
-  onPrint: () => void;
+  onToggleSection: (id: string, open: boolean) => void;
 }
 
 export default function Sidebar({
-  bibles,
-  books,
-  startVerses,
-  endVerses,
-  reference,
+  scripture,
   settings,
   summary,
   copyright,
-  canPrint,
-  onReferenceChange,
+  openSections,
+  limitCheck,
   onSettingsChange,
-  onWholeChapter,
-  onEntireBook,
-  onPrint,
+  onToggleSection,
 }: SidebarProps) {
-  const chapters = books.find((book) => book.id === reference.bookId)?.chapters ?? [];
+  const {
+    languages,
+    language,
+    setLanguage,
+    bibles,
+    books,
+    book,
+    startVerses,
+    endVerses,
+    reference,
+    setReference,
+    wholeChapter,
+    entireBook,
+  } = scripture;
+
+  const chapters = book?.chapters ?? [];
+  const comparable = bibles.filter((entry) => entry.id !== reference.bibleId);
+
+  const translationOptions = bibles.map((bible) => ({
+    id: bible.id,
+    label: bible.label,
+  }));
+  // "None" is a normal option so it stays searchable and keyboard-reachable.
+  const compareOptions = [
+    { id: "", label: "None — single translation" },
+    ...comparable.map((bible) => ({ id: bible.id, label: bible.label })),
+  ];
 
   return (
     <aside className="rail">
@@ -61,33 +93,60 @@ export default function Sidebar({
       </div>
 
       <div className="rail-body">
-        <section className="section">
-          <div className="section-title">01&nbsp;&nbsp;Passage</div>
-
+        <Section
+          index="01"
+          title="Passage"
+          open={openSections.passage ?? true}
+          onToggle={(open) => onToggleSection("passage", open)}
+        >
           <label className="control">
-            <span className="control-label">Translation</span>
-            <select
-              value={reference.bibleId}
-              onChange={(event) => onReferenceChange({ bibleId: event.target.value })}
-            >
-              {bibles.map((bible) => (
-                <option key={bible.id} value={bible.id}>
-                  {bible.label}
+            <span className="control-label">Language</span>
+            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+              {languages.map((entry) => (
+                <option key={entry.code} value={entry.code}>
+                  {entry.name} ({entry.count})
                 </option>
               ))}
             </select>
           </label>
 
+          <div className="control">
+            <div className="control-label">
+              Translation
+              <span className="control-value">{bibles.length || ""}</span>
+            </div>
+            <Combobox
+              label="Translation"
+              options={translationOptions}
+              value={reference.bibleId}
+              onChange={(bibleId) => setReference({ bibleId })}
+              disabled={!bibles.length}
+              placeholder="Search translations…"
+            />
+          </div>
+
+          <div className="control">
+            <div className="control-label">Compare with</div>
+            <Combobox
+              label="Compare with a second translation"
+              options={compareOptions}
+              value={reference.compareId}
+              onChange={(compareId) => setReference({ compareId })}
+              disabled={!comparable.length}
+              placeholder="Search translations…"
+            />
+          </div>
+
           <label className="control">
             <span className="control-label">Book</span>
             <select
               value={reference.bookId}
-              onChange={(event) => onReferenceChange({ bookId: event.target.value })}
+              onChange={(event) => setReference({ bookId: event.target.value })}
               disabled={!books.length}
             >
-              {books.map((book) => (
-                <option key={book.id} value={book.id}>
-                  {book.name}
+              {books.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
                 </option>
               ))}
             </select>
@@ -99,7 +158,7 @@ export default function Sidebar({
               <select
                 aria-label="Start chapter"
                 value={reference.startChapter}
-                onChange={(event) => onReferenceChange({ startChapter: event.target.value })}
+                onChange={(event) => setReference({ startChapter: event.target.value })}
                 disabled={!chapters.length}
               >
                 {chapters.map((chapter) => (
@@ -111,7 +170,7 @@ export default function Sidebar({
               <select
                 aria-label="Start verse"
                 value={reference.startVerse}
-                onChange={(event) => onReferenceChange({ startVerse: event.target.value })}
+                onChange={(event) => setReference({ startVerse: event.target.value })}
                 disabled={!startVerses.length}
               >
                 {startVerses.map((number) => (
@@ -129,7 +188,7 @@ export default function Sidebar({
               <select
                 aria-label="End chapter"
                 value={reference.endChapter}
-                onChange={(event) => onReferenceChange({ endChapter: event.target.value })}
+                onChange={(event) => setReference({ endChapter: event.target.value })}
                 disabled={!chapters.length}
               >
                 {chapters.map((chapter) => (
@@ -141,7 +200,7 @@ export default function Sidebar({
               <select
                 aria-label="End verse"
                 value={reference.endVerse}
-                onChange={(event) => onReferenceChange({ endVerse: event.target.value })}
+                onChange={(event) => setReference({ endVerse: event.target.value })}
                 disabled={!endVerses.length}
               >
                 {endVerses.map((number) => (
@@ -154,19 +213,34 @@ export default function Sidebar({
           </div>
 
           <div className="quick-row">
-            <button type="button" className="link-button" onClick={onWholeChapter}>
+            <button type="button" className="link-button" onClick={wholeChapter}>
               Whole chapter
             </button>
-            <button type="button" className="link-button" onClick={onEntireBook}>
+            <button type="button" className="link-button" onClick={entireBook}>
               Entire book
             </button>
           </div>
 
-          {summary ? <div className="summary">{summary}</div> : null}
-        </section>
+          {!limitCheck.ok ? <div className="warning">{limitCheck.message}</div> : null}
+          {limitCheck.ok && summary ? <div className="summary">{summary}</div> : null}
+        </Section>
 
-        <section className="section">
-          <div className="section-title">02&nbsp;&nbsp;Page layout</div>
+        <Section
+          index="02"
+          title="Page layout"
+          open={openSections.layout ?? true}
+          onToggle={(open) => onToggleSection("layout", open)}
+        >
+          {reference.compareId ? (
+            <OptionGroup
+              title="Two translations"
+              options={PARALLEL_OPTIONS}
+              value={settings.parallelMode}
+              onChange={(parallelMode) => onSettingsChange({ parallelMode })}
+              variant="stack"
+              tall
+            />
+          ) : null}
 
           <OptionGroup
             title="Paper size"
@@ -217,11 +291,14 @@ export default function Sidebar({
               </label>
             </div>
           </div>
-        </section>
+        </Section>
 
-        <section className="section">
-          <div className="section-title">03&nbsp;&nbsp;Typography</div>
-
+        <Section
+          index="03"
+          title="Typography"
+          open={openSections.typography ?? true}
+          onToggle={(open) => onToggleSection("typography", open)}
+        >
           <OptionGroup
             title="Typeface"
             options={FONT_OPTIONS}
@@ -256,11 +333,14 @@ export default function Sidebar({
               onChange={(event) => onSettingsChange({ lead: Number(event.target.value) })}
             />
           </label>
-        </section>
+        </Section>
 
-        <section className="section">
-          <div className="section-title">04&nbsp;&nbsp;Scripture text</div>
-
+        <Section
+          index="04"
+          title="Scripture text"
+          open={openSections.text ?? true}
+          onToggle={(open) => onToggleSection("text", open)}
+        >
           <OptionGroup
             title="Verse numbers"
             options={NUMBER_OPTIONS}
@@ -279,15 +359,16 @@ export default function Sidebar({
             values={settings}
             onChange={(id, next) => onSettingsChange({ [id]: next })}
           />
-        </section>
+        </Section>
       </div>
 
-      <div className="rail-footer">
-        <button type="button" className="print-button" onClick={onPrint} disabled={!canPrint}>
-          Print / Save PDF
-        </button>
-        {copyright ? <div className="copyright">{copyright}</div> : null}
-      </div>
+      {copyright ? (
+        <div className="rail-footer">
+          {/* api.bible and Crossway both require a visible, working link
+              wherever their text is shown, so bare URLs become anchors. */}
+          <div className="copyright">{linkify(copyright)}</div>
+        </div>
+      ) : null}
     </aside>
   );
 }

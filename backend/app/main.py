@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .bible import BibleClient
+from .catalog import Catalog
+from .clients import Clients
 from .config import get_settings
 from .routers import bible
 
@@ -12,18 +13,22 @@ from .routers import bible
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    app.state.bible_client = BibleClient(
-        base_url=settings.api_bible_base_url,
-        api_key=settings.api_bible_key,
-        timeout=settings.request_timeout,
-    )
-    yield
-    await app.state.bible_client.aclose()
+    clients = Clients.build(settings)
+
+    app.state.clients = clients
+    app.state.catalog = Catalog(settings, clients.helloao, clients.api_bible)
+
+    try:
+        yield
+    finally:
+        # Closed in a finally so a failure during startup or serving still
+        # releases the connection pools.
+        await clients.aclose()
 
 
 app = FastAPI(
     title="Scripture Journal API",
-    description="Serves Bible passages from api.bible for the Scripture Journal frontend.",
+    description="Serves Bible passages from several sources for the Scripture Journal frontend.",
     lifespan=lifespan,
 )
 

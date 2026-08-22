@@ -2,19 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { fetchBibles, fetchBooks, fetchPassage, fetchVerseNumbers } from "@/lib/api";
+import { useScripture } from "@/hooks/useScripture";
+import { paragraphBlocks, parallelBlocks } from "@/lib/blocks";
 import { DEFAULT_REFERENCE, DEFAULT_SETTINGS, STORAGE_KEY, ZOOM_OPTIONS } from "@/lib/constants";
+import { checkLimits } from "@/lib/limits";
 import { Measurer, paginate } from "@/lib/paginate";
+import { alignPassages } from "@/lib/parallel";
 import { pageDimensions } from "@/lib/render";
-import type { BibleSummary, Book, Passage, Reference, Settings } from "@/lib/types";
+import type { Reference, Settings } from "@/lib/types";
 
 import PageStack from "./PageStack";
 import Sidebar from "./Sidebar";
 
 type ZoomId = (typeof ZOOM_OPTIONS)[number]["id"];
 
-const verseKey = (reference: Reference, chapter: string) =>
-  `${reference.bibleId}/${reference.bookId}/${chapter}`;
+/** Trimmed, de-duplicated, empties dropped — for assembling licence notices. */
+const unique = (parts: (string | undefined)[]) =>
+  Array.from(new Set(parts.map((part) => part?.trim()).filter(Boolean) as string[]));
 
 export default function JournalApp() {
   // Settings live in localStorage, which is only readable after mount — gate
@@ -22,41 +26,14 @@ export default function JournalApp() {
   // reload the restored reference.
   const [hydrated, setHydrated] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [reference, setReference] = useState<Reference>(DEFAULT_REFERENCE);
-
-  const [bibles, setBibles] = useState<BibleSummary[]>([]);
-  const [books, setBooks] = useState<{ bibleId: string; list: Book[] }>({
-    bibleId: "",
-    list: [],
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [initial, setInitial] = useState<{ reference: Reference; language: string }>({
+    reference: DEFAULT_REFERENCE,
+    language: "eng",
   });
-  // Verse numbers per chapter; the start and end chapters may differ.
-  const [verseCache, setVerseCache] = useState<Record<string, string[]>>({});
-  const [passage, setPassage] = useState<Passage | null>(null);
-  const [status, setStatus] = useState("Loading…");
-  const [failed, setFailed] = useState(false);
 
-  // Set when a change should pull the end verse to the end of its chapter,
-  // which we can only do once that chapter's verse list has arrived.
-  const snapEndToLast = useRef(false);
-
-  const startKey = verseKey(reference, reference.startChapter);
-  const endKey = verseKey(reference, reference.endChapter);
-  const startVerses = useMemo(() => verseCache[startKey] ?? [], [verseCache, startKey]);
-  const endVerses = useMemo(() => verseCache[endKey] ?? [], [verseCache, endKey]);
-
-  const reportError = useCallback(
-    (prefix: string) => (error: unknown) => {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setFailed(true);
-      setStatus(`${prefix} — ${error instanceof Error ? error.message : "failed"}`);
-    },
-    [],
-  );
-
-  const beginLoad = useCallback((message: string) => {
-    setFailed(false);
-    setStatus(message);
-  }, []);
+  const scripture = useScripture(initial.reference, initial.language, hydrated);
+  const { reference, passage, comparePassage, status, failed } = scripture;
 
   /* ── persistence ─────────────────────────────────────────────────────── */
 
@@ -67,9 +44,15 @@ export default function JournalApp() {
         const parsed = JSON.parse(saved) as {
           settings?: Partial<Settings>;
           reference?: Partial<Reference>;
+          openSections?: Record<string, boolean>;
+          language?: string;
         };
         if (parsed.settings) setSettings((prev) => ({ ...prev, ...parsed.settings }));
-        if (parsed.reference) setReference((prev) => ({ ...prev, ...parsed.reference }));
+        if (parsed.openSections) setOpenSections(parsed.openSections);
+        setInitial({
+          reference: { ...DEFAULT_REFERENCE, ...parsed.reference },
+          language: parsed.language ?? "eng",
+        });
       }
     } catch {
       // Unreadable storage just means we start from the defaults.
@@ -80,147 +63,14 @@ export default function JournalApp() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, reference }));
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ settings, reference, openSections, language: scripture.language }),
+      );
     } catch {
       // Storage may be full or blocked; the app still works without it.
     }
-  }, [hydrated, settings, reference]);
-
-  /* ── data ────────────────────────────────────────────────────────────── */
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchBibles(controller.signal).then(setBibles).catch(reportError("Versions failed"));
-    return () => controller.abort();
-  }, [reportError]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    const controller = new AbortController();
-    const { bibleId } = reference;
-
-    beginLoad("Loading books…");
-    fetchBooks(bibleId, controller.signal)
-      .then((list) => {
-        setBooks({ bibleId, list });
-        setReference((prev) => {
-          if (prev.bibleId !== bibleId) return prev;
-          const book = list.find((entry) => entry.id === prev.bookId) ?? list[0];
-          if (!book) return prev;
-
-          const numbers = book.chapters.map((chapter) => chapter.number);
-          const fallback = numbers[0] ?? prev.startChapter;
-          const startChapter = numbers.includes(prev.startChapter)
-            ? prev.startChapter
-            : fallback;
-          let endChapter = numbers.includes(prev.endChapter) ? prev.endChapter : fallback;
-          if (Number(endChapter) < Number(startChapter)) endChapter = startChapter;
-
-          if (
-            book.id === prev.bookId &&
-            startChapter === prev.startChapter &&
-            endChapter === prev.endChapter
-          ) {
-            return prev;
-          }
-          return { ...prev, bookId: book.id, startChapter, endChapter };
-        });
-      })
-      .catch(reportError("Books failed"));
-
-    return () => controller.abort();
-  }, [hydrated, reference.bibleId, beginLoad, reportError]);
-
-  // Fetch verse numbers for whichever chapters the range currently touches.
-  useEffect(() => {
-    if (!hydrated) return;
-    if (books.bibleId !== reference.bibleId) return;
-    if (!books.list.some((book) => book.id === reference.bookId)) return;
-
-    const wanted = [
-      [startKey, reference.startChapter] as const,
-      [endKey, reference.endChapter] as const,
-    ].filter(([key], index, all) => !(key in verseCache) && all.findIndex(([k]) => k === key) === index);
-
-    if (!wanted.length) return;
-
-    const controller = new AbortController();
-    beginLoad("Loading chapter…");
-
-    Promise.all(
-      wanted.map(([key, chapter]) =>
-        fetchVerseNumbers(
-          reference.bibleId,
-          reference.bookId,
-          chapter,
-          controller.signal,
-        ).then((list) => [key, list] as const),
-      ),
-    )
-      .then((entries) => setVerseCache((prev) => ({ ...prev, ...Object.fromEntries(entries) })))
-      .catch(reportError("Chapter failed"));
-
-    return () => controller.abort();
-  }, [
-    hydrated,
-    books,
-    verseCache,
-    startKey,
-    endKey,
-    reference.bibleId,
-    reference.bookId,
-    reference.startChapter,
-    reference.endChapter,
-    beginLoad,
-    reportError,
-  ]);
-
-  // Keep the verse selections valid for the chapters they belong to.
-  useEffect(() => {
-    if (!startVerses.length || !endVerses.length) return;
-
-    // Consume the flag out here: state updaters must be pure, and React
-    // double-invokes them in StrictMode.
-    const snap = snapEndToLast.current;
-    snapEndToLast.current = false;
-
-    setReference((prev) => {
-      let { startVerse, endVerse } = prev;
-      const lastVerse = endVerses[endVerses.length - 1];
-
-      if (snap) endVerse = lastVerse;
-      if (!startVerses.includes(startVerse)) startVerse = startVerses[0];
-      if (!endVerses.includes(endVerse)) endVerse = lastVerse;
-      // Within one chapter the range must still read forwards.
-      if (prev.startChapter === prev.endChapter && Number(endVerse) < Number(startVerse)) {
-        endVerse = lastVerse;
-      }
-
-      if (startVerse === prev.startVerse && endVerse === prev.endVerse) return prev;
-      return { ...prev, startVerse, endVerse };
-    });
-  }, [startVerses, endVerses]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    // Wait until both chapters' verse lists match the current selection, so we
-    // never request a range built from a previous chapter's numbering.
-    if (!startVerses.includes(reference.startVerse)) return;
-    if (!endVerses.includes(reference.endVerse)) return;
-
-    const controller = new AbortController();
-    const chapterSpan = Number(reference.endChapter) - Number(reference.startChapter) + 1;
-    beginLoad(chapterSpan > 1 ? `Fetching ${chapterSpan} chapters…` : "Fetching text…");
-
-    fetchPassage(reference, controller.signal)
-      .then((result) => {
-        setPassage(result);
-        setStatus("");
-      })
-      .catch(reportError("Passage failed"));
-
-    return () => controller.abort();
-  }, [hydrated, startVerses, endVerses, reference, beginLoad, reportError]);
+  }, [hydrated, settings, reference, openSections, scripture.language]);
 
   /* ── pagination ──────────────────────────────────────────────────────── */
 
@@ -248,11 +98,37 @@ export default function JournalApp() {
     };
   }, []);
 
+  const parallel = Boolean(comparePassage);
+  const facing = parallel && settings.parallelMode === "facing";
+
   const pages = useMemo(() => {
     const measurer = measurerRef.current;
     if (!measureReady || !measurer || !passage) return null;
-    return paginate(passage.paragraphs, settings, measurer);
-  }, [measureReady, passage, settings]);
+
+    if (!parallel) {
+      return paginate(paragraphBlocks(passage.paragraphs, settings), settings, measurer);
+    }
+
+    if (facing) {
+      // One translation per sheet: paginate each, then interleave so the pair
+      // for a given stretch of text lands on facing pages.
+      const left = paginate(paragraphBlocks(passage.paragraphs, settings), settings, measurer);
+      const right = paginate(
+        paragraphBlocks(comparePassage!.paragraphs, settings),
+        settings,
+        measurer,
+      );
+      const merged: string[][] = [];
+      for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+        merged.push(left[i] ?? [""]);
+        merged.push(right[i] ?? [""]);
+      }
+      return merged;
+    }
+
+    const rows = alignPassages(passage.paragraphs, comparePassage!.paragraphs);
+    return paginate(parallelBlocks(rows, settings), settings, measurer);
+  }, [measureReady, passage, comparePassage, settings, parallel, facing]);
 
   /* ── zoom ────────────────────────────────────────────────────────────── */
 
@@ -281,82 +157,75 @@ export default function JournalApp() {
 
   /* ── handlers ────────────────────────────────────────────────────────── */
 
-  const handleReferenceChange = useCallback(
-    (patch: Partial<Reference>) => {
-      const next = { ...reference, ...patch };
-      let snap = false;
-
-      if (patch.bookId !== undefined) {
-        // A new book has its own numbering; start from its first chapter.
-        next.startChapter = "1";
-        next.startVerse = "1";
-        next.endChapter = "1";
-        snap = true;
-      }
-
-      if (patch.startChapter !== undefined) {
-        next.startVerse = "1";
-        if (Number(next.endChapter) < Number(next.startChapter)) {
-          next.endChapter = next.startChapter;
-          snap = true;
-        }
-      }
-
-      if (patch.endChapter !== undefined) {
-        snap = true;
-        if (Number(next.startChapter) > Number(next.endChapter)) {
-          next.startChapter = next.endChapter;
-          next.startVerse = "1";
-        }
-      }
-
-      // Within one chapter, dragging either end past the other pushes it along.
-      if (next.startChapter === next.endChapter) {
-        if (patch.startVerse && Number(next.endVerse) < Number(next.startVerse)) {
-          next.endVerse = next.startVerse;
-        }
-        if (patch.endVerse && Number(next.startVerse) > Number(next.endVerse)) {
-          next.startVerse = next.endVerse;
-        }
-      }
-
-      if (snap) snapEndToLast.current = true;
-      setReference(next);
-    },
-    [reference],
-  );
-
   const handleSettingsChange = useCallback(
     (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch })),
     [],
   );
 
-  const handleWholeChapter = useCallback(() => {
-    snapEndToLast.current = true;
-    setReference((prev) => ({
-      ...prev,
-      startVerse: "1",
-      endChapter: prev.startChapter,
-    }));
-  }, []);
-
-  const handleEntireBook = useCallback(() => {
-    const book = books.list.find((entry) => entry.id === reference.bookId);
-    const lastChapter = book?.chapters[book.chapters.length - 1]?.number;
-    if (!lastChapter) return;
-
-    snapEndToLast.current = true;
-    setReference((prev) => ({
-      ...prev,
-      startChapter: "1",
-      startVerse: "1",
-      endChapter: lastChapter,
-    }));
-  }, [books, reference.bookId]);
+  const handleToggleSection = useCallback(
+    (id: string, open: boolean) => setOpenSections((prev) => ({ ...prev, [id]: open })),
+    [],
+  );
 
   /* ── derived ─────────────────────────────────────────────────────────── */
 
-  const bookName = books.list.find((entry) => entry.id === reference.bookId)?.name;
+  const bookName = scripture.book?.name;
+  const limitCheck = checkLimits(
+    scripture.bibles,
+    [reference.bibleId, reference.compareId].filter(Boolean),
+    scripture.book,
+    reference,
+  );
+
+  /** Abbreviation for a translation id, from the "NIV — …" label form. */
+  const abbreviation = useCallback(
+    (id: string) => {
+      if (!id) return "";
+      const bible = scripture.bibles.find((entry) => entry.id === id);
+      return bible ? bible.label.split(" — ")[0].trim() : id;
+    },
+    [scripture.bibles],
+  );
+
+  // The in-context citation both api.bible and Crossway require: the
+  // abbreviation printed with the passage it belongs to.
+  const citation = useMemo(
+    () =>
+      [reference.bibleId, reference.compareId]
+        .filter(Boolean)
+        .map(abbreviation)
+        .filter(Boolean)
+        .join(" · "),
+    [reference.bibleId, reference.compareId, abbreviation],
+  );
+
+  // Required on every sheet, so kept to bare domains: "esv.org", not a URL.
+  const sources = useMemo(
+    () =>
+      unique([passage?.attribution, comparePassage?.attribution])
+        .map((url) => url.replace(/^https?:\/\//, "").replace(/\/$/, ""))
+        .join("   ·   "),
+    [passage?.attribution, comparePassage?.attribution],
+  );
+
+  // The full publisher notices — printed once, on the last sheet. Deduped so
+  // two translations from one upstream do not repeat it.
+  const copyright = useMemo(
+    () => unique([passage?.copyright, comparePassage?.copyright]).join("   "),
+    [passage?.copyright, comparePassage?.copyright],
+  );
+
+  /** Everything a licence requires shown somewhere, for the sidebar. */
+  const notice = useMemo(
+    () =>
+      unique([
+        passage?.copyright,
+        comparePassage?.copyright,
+        passage?.attribution,
+        comparePassage?.attribution,
+      ]).join("  ·  "),
+    [passage, comparePassage],
+  );
 
   const referenceLabel = useMemo(() => {
     if (!bookName) return "—";
@@ -368,8 +237,10 @@ export default function JournalApp() {
     return `${bookName} ${startChapter}:${startVerse}–${endChapter}:${endVerse}`;
   }, [bookName, reference]);
 
-  const pageCount = pages ? (settings.layout === "verso" ? pages.length * 2 : pages.length) : 0;
+  const blanks = settings.layout === "verso" && !facing;
+  const pageCount = pages ? (blanks ? pages.length * 2 : pages.length) : 0;
   const chapterSpan = Number(reference.endChapter) - Number(reference.startChapter) + 1;
+  const canPrint = Boolean(pages) && limitCheck.ok;
 
   const pageCountLabel = `${pageCount} ${settings.pageSize} page${pageCount === 1 ? "" : "s"}`;
 
@@ -387,20 +258,14 @@ export default function JournalApp() {
       <style>{`@page { size: ${settings.pageSize === "Letter" ? "letter" : "A4"} ${settings.orientation}; margin: 0; }`}</style>
 
       <Sidebar
-        bibles={bibles}
-        books={books.list}
-        startVerses={startVerses}
-        endVerses={endVerses}
-        reference={reference}
+        scripture={scripture}
         settings={settings}
         summary={summary}
-        copyright={passage?.copyright ?? ""}
-        canPrint={Boolean(pages)}
-        onReferenceChange={handleReferenceChange}
+        copyright={notice}
+        openSections={openSections}
+        limitCheck={limitCheck}
         onSettingsChange={handleSettingsChange}
-        onWholeChapter={handleWholeChapter}
-        onEntireBook={handleEntireBook}
-        onPrint={() => window.print()}
+        onToggleSection={handleToggleSection}
       />
 
       <main className="desk" ref={deskRef}>
@@ -421,6 +286,37 @@ export default function JournalApp() {
                 {option.label}
               </button>
             ))}
+
+            <button
+              type="button"
+              className="download-button"
+              onClick={() => window.print()}
+              disabled={!canPrint}
+              aria-label="Print or save as PDF"
+              title={
+                canPrint
+                  ? `Print / save as PDF — ${pageCountLabel}`
+                  : limitCheck.ok
+                    ? "Nothing to print yet"
+                    : limitCheck.message
+              }
+            >
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -430,7 +326,11 @@ export default function JournalApp() {
               pages={pages}
               settings={settings}
               reference={referenceLabel}
+              citation={citation}
+              sources={sources}
+              copyright={copyright}
               scale={scale}
+              interleaveBlanks={blanks}
             />
           ) : null}
         </div>

@@ -1,4 +1,10 @@
-import type { BibleSummary, Book, Passage, Reference } from "./types";
+import type {
+  BibleSummary,
+  Book,
+  LanguageSummary,
+  Passage,
+  Reference,
+} from "./types";
 
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(path, { signal });
@@ -14,8 +20,11 @@ async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export const fetchBibles = (signal: AbortSignal) =>
-  getJson<BibleSummary[]>("/api/bibles", signal);
+export const fetchLanguages = (signal: AbortSignal) =>
+  getJson<LanguageSummary[]>("/api/languages", signal);
+
+export const fetchBibles = (language: string, signal: AbortSignal) =>
+  getJson<BibleSummary[]>(`/api/bibles?language=${encodeURIComponent(language)}`, signal);
 
 export const fetchBooks = (bibleId: string, signal: AbortSignal) =>
   getJson<Book[]>(`/api/bibles/${bibleId}/books`, signal);
@@ -31,8 +40,12 @@ export const fetchVerseNumbers = (
     signal,
   );
 
-export const fetchPassage = (reference: Reference, signal: AbortSignal) => {
-  const { bibleId, bookId, startChapter, startVerse, endChapter, endVerse } = reference;
+export const fetchPassage = (
+  bibleId: string,
+  reference: Reference,
+  signal: AbortSignal,
+) => {
+  const { bookId, startChapter, startVerse, endChapter, endVerse } = reference;
   const query = new URLSearchParams({
     start_chapter: startChapter,
     start_verse: startVerse,
