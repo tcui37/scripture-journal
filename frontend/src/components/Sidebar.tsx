@@ -9,7 +9,9 @@ import {
   PAGE_SIZE_OPTIONS,
   PAPER_OPTIONS,
   PARALLEL_OPTIONS,
+  POETRY_INDENT_OPTIONS,
   TEXT_TOGGLES,
+  parallelSideLabels,
 } from "@/lib/constants";
 import type { LimitCheck } from "@/lib/limits";
 import type { Settings } from "@/lib/types";
@@ -73,6 +75,8 @@ export default function Sidebar({
   const comparable = bibles.filter((entry) => entry.id !== reference.bibleId);
   const multilingual = selectedLanguages.length > 1;
   const selectedLanguageSet = new Set(selectedLanguages);
+  const comparing = Boolean(reference.compareId);
+  const sides = parallelSideLabels(settings.parallelMode, settings.parallelSwap);
 
   const withLanguage = (bible: (typeof bibles)[number]) =>
     multilingual ? `${bible.label} · ${bible.language_name}` : bible.label;
@@ -151,7 +155,9 @@ export default function Sidebar({
           <div className="control">
             <div className="control-label">
               Translation
-              <span className="control-value">{bibles.length || ""}</span>
+              <span className="control-value">
+                {comparing ? sides.primary : bibles.length || ""}
+              </span>
             </div>
             <Combobox
               label="Translation"
@@ -164,16 +170,52 @@ export default function Sidebar({
           </div>
 
           <div className="control">
-            <div className="control-label">Compare with</div>
+            <div className="control-label">
+              Compare with
+              {comparing ? <span className="control-value">{sides.compare}</span> : null}
+            </div>
             <Combobox
               label="Compare with a second translation"
               options={compareOptions}
               value={reference.compareId}
-              onChange={(compareId) => setReference({ compareId })}
+              onChange={(compareId) => {
+                setReference({ compareId });
+                if (!compareId && settings.parallelSwap) {
+                  onSettingsChange({ parallelSwap: false });
+                }
+              }}
               disabled={!comparable.length}
               placeholder="Search translations…"
             />
           </div>
+
+          {comparing ? (
+            <button
+              type="button"
+              className={`swap-button${settings.parallelSwap ? " is-on" : ""}`}
+              onClick={() => onSettingsChange({ parallelSwap: !settings.parallelSwap })}
+              aria-pressed={settings.parallelSwap}
+              aria-label="Swap translation sides"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="16 3 21 7 16 11" />
+                <line x1="21" y1="7" x2="3" y2="7" />
+                <polyline points="8 21 3 17 8 13" />
+                <line x1="3" y1="17" x2="21" y2="17" />
+              </svg>
+              Swap sides
+            </button>
+          ) : null}
 
           <label className="control">
             <span className="control-label">Book</span>
@@ -307,6 +349,21 @@ export default function Sidebar({
             onChange={(lines) => onSettingsChange({ lines })}
             variant="grid-2"
           />
+          {settings.lines !== "none" ? (
+            <div className="control">
+              <div className="toggle-list">
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.titleLine}
+                    onChange={(event) => onSettingsChange({ titleLine: event.target.checked })}
+                  />
+                  <span className="toggle-box" aria-hidden="true" />
+                  <span>Date and title line</span>
+                </label>
+              </div>
+            </div>
+          ) : null}
           <OptionGroup
             title="Paper colour"
             options={PAPER_OPTIONS}
@@ -390,6 +447,13 @@ export default function Sidebar({
             options={FLOW_OPTIONS}
             value={settings.flow}
             onChange={(flow) => onSettingsChange({ flow })}
+          />
+          <OptionGroup
+            title="Poetry indent"
+            options={POETRY_INDENT_OPTIONS}
+            value={settings.poetryIndent}
+            onChange={(poetryIndent) => onSettingsChange({ poetryIndent })}
+            variant="grid-3"
           />
           <ToggleList
             title="Show"

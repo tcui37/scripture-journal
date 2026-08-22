@@ -71,6 +71,21 @@ def test_needs_space_rules():
     assert _needs_space("light", "’’") is False  # closing quote
     assert _needs_space("", "x") is False
     assert _needs_space("x", "") is False
+    assert _needs_space("神爱世人", "甚至") is False  # CJK: no invented space
+    assert _needs_space("하나님이", "세상을") is False
+
+
+def test_cjk_footnote_does_not_insert_a_space():
+    content = [
+        {
+            "type": "verse",
+            "number": 16,
+            "content": ["神爱世人", {"noteId": 1}, "甚至将他的独生子赐给他们"],
+        }
+    ]
+    assert text_of(_parse_chapter(content, first=None, last=None)) == (
+        "神爱世人甚至将他的独生子赐给他们"
+    )
 
 
 def test_helloao_trims_to_the_requested_range():

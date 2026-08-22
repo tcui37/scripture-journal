@@ -96,3 +96,18 @@ export function alignPassages(
 
   return rows;
 }
+
+/** Which passage sits in which slot — swap is local, so a flip does not refetch. */
+export function orderedSides<T>(
+  primary: T,
+  compare: T | null | undefined,
+  swapped: boolean,
+): { primary: T; secondary: T | null } {
+  if (swapped && compare) return { primary: compare, secondary: primary };
+  return { primary, secondary: compare ?? null };
+}
+
+/** Translation ids in display order for the in-context citation line. */
+export function citationIds(bibleId: string, compareId: string, swapped: boolean): string[] {
+  return (swapped ? [compareId, bibleId] : [bibleId, compareId]).filter(Boolean);
+}

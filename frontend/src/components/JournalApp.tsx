@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { uniqueLanguages, useScripture } from "@/hooks/useScripture";
+import { useScripture } from "@/hooks/useScripture";
+import { uniqueLanguages } from "@/lib/bibles";
 import {
   combineParallelBands,
   combineParallelColumns,
@@ -11,9 +12,10 @@ import {
   parallelBlocks,
 } from "@/lib/blocks";
 import { DEFAULT_REFERENCE, DEFAULT_SETTINGS, STORAGE_KEY, ZOOM_OPTIONS } from "@/lib/constants";
+import { printFilename } from "@/lib/filename";
 import { checkLimits } from "@/lib/limits";
 import { Measurer, paginate } from "@/lib/paginate";
-import { alignPassages } from "@/lib/parallel";
+import { alignPassages, citationIds, orderedSides } from "@/lib/parallel";
 import { pageDimensions, singleTextGeometry } from "@/lib/render";
 import type { Reference, Settings } from "@/lib/types";
 
@@ -25,6 +27,8 @@ type ZoomId = (typeof ZOOM_OPTIONS)[number]["id"];
 /** Trimmed, de-duplicated, empties dropped — for assembling licence notices. */
 const unique = (parts: (string | undefined)[]) =>
   Array.from(new Set(parts.map((part) => part?.trim()).filter(Boolean) as string[]));
+
+const APP_TITLE = "Scripture Journal";
 
 export default function JournalApp() {
   // Settings live in localStorage, which is only readable after mount — gate
@@ -119,21 +123,30 @@ export default function JournalApp() {
 
   const parallel = Boolean(comparePassage);
   const facing = parallel && settings.parallelMode === "facing";
+  const { primary: primaryPassage, secondary: secondaryPassage } = orderedSides(
+    passage,
+    comparePassage,
+    settings.parallelSwap,
+  );
 
   const pages = useMemo(() => {
     const measurer = measurerRef.current;
-    if (!measureReady || !measurer || !passage) return null;
+    if (!measureReady || !measurer || !primaryPassage) return null;
 
-    if (!parallel) {
-      return paginate(paragraphBlocks(passage.paragraphs, settings), settings, measurer);
+    if (!parallel || !secondaryPassage) {
+      return paginate(paragraphBlocks(primaryPassage.paragraphs, settings), settings, measurer);
     }
 
     if (facing) {
       // One translation per sheet: paginate each, then interleave so the pair
       // for a given stretch of text lands on facing pages.
-      const left = paginate(paragraphBlocks(passage.paragraphs, settings), settings, measurer);
+      const left = paginate(
+        paragraphBlocks(primaryPassage.paragraphs, settings),
+        settings,
+        measurer,
+      );
       const right = paginate(
-        paragraphBlocks(comparePassage!.paragraphs, settings),
+        paragraphBlocks(secondaryPassage.paragraphs, settings),
         settings,
         measurer,
       );
@@ -161,33 +174,31 @@ export default function JournalApp() {
             height: Math.max(1, Math.floor((region.height - PARALLEL_GAP) / 2)),
           };
       const left = paginate(
-        paragraphBlocks(passage.paragraphs, settings),
+        paragraphBlocks(primaryPassage.paragraphs, settings),
         settings,
         measurer,
         box,
       );
       const right = paginate(
-        paragraphBlocks(comparePassage!.paragraphs, settings),
+        paragraphBlocks(secondaryPassage.paragraphs, settings),
         settings,
         measurer,
         box,
       );
       const combined: string[][] = [];
       for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-        const primary = left[i]?.[0] ?? "";
-        const secondary = right[i]?.[0] ?? "";
+        const first = left[i]?.[0] ?? "";
+        const second = right[i]?.[0] ?? "";
         combined.push([
-          flow
-            ? combineParallelColumns(primary, secondary)
-            : combineParallelBands(primary, secondary),
+          flow ? combineParallelColumns(first, second) : combineParallelBands(first, second),
         ]);
       }
       return combined;
     }
 
-    const rows = alignPassages(passage.paragraphs, comparePassage!.paragraphs);
+    const rows = alignPassages(primaryPassage.paragraphs, secondaryPassage.paragraphs);
     return paginate(parallelBlocks(rows, settings), settings, measurer);
-  }, [measureReady, passage, comparePassage, settings, parallel, facing]);
+  }, [measureReady, primaryPassage, secondaryPassage, settings, parallel, facing]);
 
   /* ── zoom ────────────────────────────────────────────────────────────── */
 
@@ -250,12 +261,11 @@ export default function JournalApp() {
   // abbreviation printed with the passage it belongs to.
   const citation = useMemo(
     () =>
-      [reference.bibleId, reference.compareId]
-        .filter(Boolean)
+      citationIds(reference.bibleId, reference.compareId, settings.parallelSwap)
         .map(abbreviation)
         .filter(Boolean)
         .join(" · "),
-    [reference.bibleId, reference.compareId, abbreviation],
+    [reference.bibleId, reference.compareId, abbreviation, settings.parallelSwap],
   );
 
   // Required on every sheet, so kept to bare domains: "esv.org", not a URL.
@@ -295,6 +305,18 @@ export default function JournalApp() {
     }
     return `${bookName} ${startChapter}:${startVerse}–${endChapter}:${endVerse}`;
   }, [bookName, reference]);
+
+  const downloadTitle = useMemo(
+    () => (bookName ? printFilename(bookName, reference) : APP_TITLE),
+    [bookName, reference],
+  );
+
+  useEffect(() => {
+    document.title = downloadTitle;
+    return () => {
+      document.title = APP_TITLE;
+    };
+  }, [downloadTitle]);
 
   const blanks = settings.layout === "verso" && !facing && settings.lines !== "none";
   const pageLayout =

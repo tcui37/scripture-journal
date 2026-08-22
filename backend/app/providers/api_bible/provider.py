@@ -8,6 +8,7 @@ range are trimmed locally.
 
 from typing import Any
 
+from ...canon import short_name
 from ...schemas import Book, Chapter, Passage
 from ..base import (
     build_reference,
@@ -54,7 +55,11 @@ class ApiBibleProvider:
                 if chapter["number"] != "intro"
             ]
             books.append(
-                Book(id=book["id"], name=book.get("nameLong") or book["name"], chapters=chapters)
+                Book(
+                    id=book["id"],
+                    name=short_name(book["id"], book.get("nameLong") or book["name"]),
+                    chapters=chapters,
+                )
             )
 
         return books

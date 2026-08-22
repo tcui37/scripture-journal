@@ -17,7 +17,7 @@ import {
   RULE,
   WORDS_OF_CHRIST,
 } from "./constants";
-import type { Paragraph, Settings, Verse } from "./types";
+import type { Paragraph, PoetryIndent, Settings, Verse } from "./types";
 
 export const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -77,14 +77,21 @@ export function verseHtml(verse: Verse, settings: Settings) {
   return html;
 }
 
+/** Left padding for USFM poetry styles. Regular matches the previous hardcoded look. */
+export function poetryPadding(style: string, indent: PoetryIndent): string {
+  if (indent === "off" || !/^q/.test(style)) return "0";
+  const deep = indent === "deep";
+  if (/^q2/.test(style)) return deep ? "3.4em" : "2.2em";
+  return deep ? "2em" : "1.2em";
+}
+
 export function paragraphHtml(paragraph: Paragraph, settings: Settings) {
   if (paragraph.kind === "chapter") return chapterHtml(paragraph.heading, settings);
   if (paragraph.kind === "heading") return headingHtml(paragraph.heading, settings);
 
   const verses = paragraph.verses;
   const align = settings.justify ? "text-align:justify;hyphens:auto" : "text-align:left";
-  // q1/q2 are poetry lines; indent them the way a print Bible would.
-  const indent = /^q2/.test(paragraph.style) ? "2.2em" : /^q/.test(paragraph.style) ? "1.2em" : "0";
+  const indent = poetryPadding(paragraph.style, settings.poetryIndent);
   const base = typeCss(settings);
 
   if (settings.flow === "line") {
@@ -312,18 +319,50 @@ function writingAreaSvg(width: number, height: number, settings: Settings) {
 const position = (box: Box) =>
   `position:absolute;left:${box.x}px;top:${box.y}px;width:${box.width}px;height:${box.height}px;`;
 
-function lineBoxHtml(box: LineBox, settings: Settings) {
+function titleBandSvg(width: number, pitch: number) {
+  const height = Math.round(pitch * 2 + 8);
+  const dateWidth = Math.max(48, Math.round(width * 0.42));
+  const dateY = Math.round(pitch * 0.7) + 0.5;
+  const titleY = Math.round(pitch * 1.7) + 0.5;
+  return {
+    height,
+    html: `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block"><path d="M0 ${dateY}H${dateWidth}M0 ${titleY}H${width}" stroke="${RULE}" stroke-width="1"/></svg>`,
+  };
+}
+
+function lineBoxHtml(box: LineBox, settings: Settings, header?: string) {
+  let border = "";
+  let padLeft = 0;
+  let padTop = 0;
+  let innerW = box.width;
+  let innerH = box.height;
+
   if (box.border === "left") {
-    const pad = 16;
-    const inner = writingAreaSvg(box.width - pad - 1, box.height, settings);
-    return `<div style="${position(box)}border-left:1px solid ${HAIRLINE};padding-left:${pad}px">${inner}</div>`;
+    border = `border-left:1px solid ${HAIRLINE};`;
+    padLeft = 16;
+    innerW = box.width - padLeft - 1;
+  } else if (box.border === "top") {
+    border = `border-top:1px solid ${HAIRLINE};`;
+    padTop = 14;
+    innerH = box.height - padTop - 1;
   }
-  if (box.border === "top") {
-    const pad = 14;
-    const inner = writingAreaSvg(box.width, box.height - pad - 1, settings);
-    return `<div style="${position(box)}border-top:1px solid ${HAIRLINE};padding-top:${pad}px">${inner}</div>`;
+
+  const pitch = rulePitch(settings);
+  const showTitle = settings.titleLine;
+  const showHeader = Boolean(header && showTitle);
+  const headerH = showHeader ? 16 : 0;
+  const title = showTitle ? titleBandSvg(innerW, pitch) : { height: 0, html: "" };
+
+  const parts: string[] = [];
+  if (showHeader) {
+    parts.push(
+      `<div style="font-family:${SANS};font-size:7pt;letter-spacing:.12em;text-transform:uppercase;color:${MUTED};height:${headerH}px;line-height:${headerH}px;overflow:hidden">${escapeHtml(header!)}</div>`,
+    );
   }
-  return `<div style="${position(box)}">${writingAreaSvg(box.width, box.height, settings)}</div>`;
+  if (title.html) parts.push(title.html);
+  parts.push(writingAreaSvg(innerW, Math.max(0, innerH - headerH - title.height), settings));
+
+  return `<div style="${position(box)}${border}padding-left:${padLeft}px;padding-top:${padTop}px">${parts.join("")}</div>`;
 }
 
 export interface PageOptions {
@@ -418,7 +457,10 @@ export function pageHtml({
       width: geo.page.width - 2 * MARGIN,
       height: geo.available,
     };
-    return lineBoxHtml(full, settings) + footer;
+    const header = settings.titleLine
+      ? [reference, citation].filter(Boolean).join("  ·  ")
+      : undefined;
+    return lineBoxHtml(full, settings, header) + footer;
   }
 
   const text = geo.slots

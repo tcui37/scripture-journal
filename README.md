@@ -6,7 +6,8 @@ chapter, or an entire book — choose a sheet size and layout, then print or sav
 as PDF. A4 or Letter, portrait or landscape. Two translations can be shown
 together for comparison.
 
-Next.js frontend, FastAPI backend, scripture from four sources.
+Next.js frontend, FastAPI backend, scripture from four sources. When two
+sources carry the same text, only the most trusted listing is shown.
 
 ## Layout
 
@@ -33,8 +34,43 @@ short id (`niv`, `esv`, `ao-BSB`) to the provider that serves it; the curated
 entries are fixed and the rest are discovered from the upstream catalogues at
 run time.
 
+**Trust order** (one listing per text; lower rank wins):
+
+1. Official first-party APIs — Crossway for the ESV
+2. **api.bible** — licensed general catalog, richest markup
+3. helloao — open / public-domain fallback
+4. bible-api.com (and community mirrors such as Bolls) — last resort
+
+Bolls ([API docs](https://github.com/Bolls-Bible/bain/blob/master/docs/API.md))
+was evaluated and **not** added: no per-translation licence grant (only a
+takedown note), and the popular CJK editions it hosts are either still
+copyrighted (新共同訳, 新改訳 2003, CUNP, 개역한글) or arrive as flattened
+furigana that we cannot print (`神,かみ`). Presence on Bolls is not a right
+to republish.
+
 A translation is only offered if its upstream is configured — without
 `ESV_API_KEY` the ESV simply does not appear.
+
+Curated Chinese, Korean, and Japanese editions. Slugs stay stable; the
+upstream can change when a more trusted source has the same text.
+
+| Id | Label | Source | Notes |
+| --- | --- | --- | --- |
+| `cuvs` / `cuvt` | CUV 和合本, simplified / traditional | helloao (`cmn_cu1` / `cmn_cuv`) | The usual church 和合本 (新标点 / 新標點). api.bible does not carry CUV. |
+| `occb` / `occbt` | OCCB 当代译本, simplified / traditional | **api.bible** when the key is set, else helloao | Same Biblica Open Chinese Contemporary Bible (CC BY-SA), not the copyrighted CCB. |
+| `krv1910` | 개역 1910 | helloao (`kor_old`) | Public-domain Korean Bible; **not** 개역개정. api.bible does not carry it. |
+| `jpn1965` | 新改訳 1965 | helloao (`jpn_loc`) | Public-domain 1965 Shinkaiyaku **NT only**. api.bible does not carry it. |
+
+Language codes follow helloao: `cmn` (Mandarin), `kor`, `jpn`. Traditional
+and simplified Chinese share `cmn`; the script is in the translation label.
+
+These popular editions are **not** offered — no licensed or keyless source
+among the providers we will use, and we do not scrape: RCUV /
+和合本修订本, CNVT / 新译本, official CCB, 개역개정 (NKRV), KLB,
+新共同訳, 口語訳, 文語訳, and post-1965 新改訳. bible-api.com has a CUV
+and helloao has FEB; those are hidden when a more trusted source already
+serves the same text (helloao CUV stays, because api.bible has no CUV;
+FEB is listed from api.bible when the key is set).
 
 ### Things worth knowing
 
@@ -84,7 +120,7 @@ user.
 | NIV, NASB, MSG (api.bible, copyright-reserved) | **100 verses** | api.bible terms §12 |
 | ESV (Crossway) | **500 verses, or half a book** — whichever is smaller; single-chapter books exempt | ESV API terms |
 | KJV, ASV, WEB, DRA, GNV, FBV (api.bible, public domain / CC) | none | not licensed content |
-| `ao-*` (helloao), `bbe`/`darby`/`webbe`/`oeb`/`ylt` (bible-api.com) | none | public domain / open |
+| `ao-*` (helloao), curated CJK (`cuvs`/`cuvt`/`krv1910`/`jpn1965`; `occb`/`occbt` when served from helloao), `bbe`/`darby`/`ylt` (helloao), `oeb` (bible-api.com), `webbe` (open) | none | public domain / open |
 
 api.bible's cap is a printing restriction, which is the operative one here
 because printing is all this app does. [Terms and
@@ -187,7 +223,9 @@ No keys are needed to run it — the two keyless sources supply about 1,250
 translations on their own. Keys only add more: an api.bible key (free,
 <https://scripture.api.bible/>) brings the NIV, KJV, NASB, MSG and ~245 others,
 and a Crossway key (free for non-commercial use, <https://api.esv.org/>) adds
-the ESV. A source with no key simply is not offered.
+the ESV. A source with no key simply is not offered. When the api.bible key
+is present, OCCB and WEBBE switch to it (same slugs: `occb`, `occbt`, `webbe`)
+and helloao copies of those texts are hidden.
 
 ```bash
 cp backend/.env.example backend/.env   # optional; add keys if you have them

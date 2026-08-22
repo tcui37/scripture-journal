@@ -10,6 +10,7 @@ import asyncio
 
 import pytest
 
+from app.canon import short_name
 from app.providers.base import (
     build_reference,
     canonical_books,
@@ -97,6 +98,18 @@ def test_build_reference_unknown_book_uses_the_id():
     assert build_reference("TOB", 1, 1, 1, 2) == "TOB 1:1–2"
 
 
+def test_short_name_prefers_the_english_canon():
+    assert short_name("MAT", "The Gospel According to Matthew") == "Matthew"
+    assert short_name("GEN", "1. Mose") == "Genesis"
+    assert short_name("TOB", "Tobit") == "Tobit"
+
+
+def test_short_name_keeps_cjk_titles():
+    assert short_name("JHN", "約翰福音") == "約翰福音"
+    assert short_name("MAT", "마태복음") == "마태복음"
+    assert short_name("GEN", "創世記") == "創世記"
+
+
 def test_canonical_books_can_drop_the_old_testament():
     """YLT (and any NT-only edition) must not be offered Genesis through Malachi."""
     whole = canonical_books()
@@ -104,6 +117,33 @@ def test_canonical_books_can_drop_the_old_testament():
     assert whole[0].id == "GEN" and whole[-1].id == "REV"
     assert nt[0].id == "MAT" and nt[-1].id == "REV"
     assert {book.id for book in nt}.isdisjoint({"GEN", "PSA", "MAL"})
+
+
+@pytest.mark.asyncio
+async def test_helloao_keeps_cjk_book_names():
+    class BooksHelloAo:
+        async def get(self, path: str):
+            return {
+                "books": [
+                    {
+                        "id": "JHN",
+                        "commonName": "約翰福音",
+                        "firstChapterNumber": 1,
+                        "lastChapterNumber": 21,
+                    },
+                    {
+                        "id": "MAT",
+                        "commonName": "The Gospel According to Matthew",
+                        "firstChapterNumber": 1,
+                        "lastChapterNumber": 28,
+                    },
+                ]
+            }
+
+    books = await HelloAoProvider(BooksHelloAo(), "cmn_cuv").list_books()  # type: ignore[arg-type]
+    by_id = {book.id: book.name for book in books}
+    assert by_id["JHN"] == "約翰福音"
+    assert by_id["MAT"] == "Matthew"
 
 
 # ── end to end through a provider, with a stub client ─────────────────────

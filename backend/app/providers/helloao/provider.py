@@ -7,6 +7,7 @@ strings and `{"text": …, "poem": 1}` fragments for poetry.
 
 from typing import Any
 
+from ...canon import has_cjk, short_name
 from ...schemas import Book, Chapter, Paragraph, Passage, Segment, Verse
 from ..base import (
     build_reference,
@@ -30,7 +31,9 @@ class HelloAoProvider:
         return [
             Book(
                 id=book["id"],
-                name=book.get("commonName") or book.get("name") or book["id"],
+                name=short_name(
+                    book["id"], book.get("commonName") or book.get("name") or book["id"]
+                ),
                 chapters=_chapters(book),
             )
             for book in data.get("books") or []
@@ -190,5 +193,9 @@ def _needs_space(before: str, after: str) -> bool:
     if not before or not after:
         return False
     if before[-1].isspace() or after[0].isspace():
+        return False
+    # CJK does not put spaces between words; a dropped footnote must not
+    # invent one ("神爱世人" + note + "甚至" → not "神爱世人 甚至").
+    if has_cjk(before[-1]) or has_cjk(after[0]):
         return False
     return after[0] not in _BINDS_LEFT

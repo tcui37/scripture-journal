@@ -534,6 +534,33 @@ button {
   color: var(--color-accent-700);
 }
 
+.swap-button {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-700);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.swap-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.swap-button.is-on {
+  border-color: var(--color-neutral-800);
+  color: var(--color-neutral-800);
+}
+
 /* ── preview surface ───────────────────────────────────────────────────── */
 
 .desk {

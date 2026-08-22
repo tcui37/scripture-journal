@@ -66,6 +66,8 @@ export type LineStyle = "ruled" | "dots" | "blank" | "none";
 export type FontChoice = "serif" | "sans";
 export type NumberStyle = "sup" | "inline";
 export type Flow = "para" | "line";
+/** Hanging indent for USFM poetry lines (q / q2). */
+export type PoetryIndent = "off" | "regular" | "deep";
 export type Paper = "Ivory" | "Bright white" | "Warm grey";
 export type PageSize = "A4" | "Letter";
 export type Orientation = "portrait" | "landscape";
@@ -84,12 +86,17 @@ export interface Settings {
   lead: number;
   numbers: NumberStyle;
   flow: Flow;
+  poetryIndent: PoetryIndent;
   wordsOfChrist: boolean;
   pageNumbers: boolean;
   paper: Paper;
   justify: boolean;
   showHeadings: boolean;
   showChapterNumbers: boolean;
+  /** Flip which translation sits left/top vs right/bottom. */
+  parallelSwap: boolean;
+  /** Date and title rules at the top of each writing area. */
+  titleLine: boolean;
 }
 
 /**

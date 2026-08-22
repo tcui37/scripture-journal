@@ -34,6 +34,35 @@ BOOK_ORDER: list[str] = list(BOOK_NAMES)
 NEW_TESTAMENT_START = BOOK_ORDER.index("MAT")
 
 
+# Hiragana, Katakana, CJK ideographs, Hangul — used to keep a translation's
+# own short book names (约翰福音, 마태복음, 創世記) instead of the English canon.
+_CJK_RANGES = (
+    (0x3040, 0x30FF),
+    (0x3400, 0x9FFF),
+    (0xAC00, 0xD7AF),
+    (0xF900, 0xFAFF),
+)
+
+
+def has_cjk(text: str) -> bool:
+    """True if `text` contains Chinese, Japanese, or Korean letters."""
+    return any(any(start <= ord(ch) <= end for start, end in _CJK_RANGES) for ch in text)
+
+
+def short_name(book_id: str, fallback: str | None = None) -> str:
+    """Usual English short title for a Protestant book.
+
+    Upstreams often return verbose or localised labels ("The Gospel According
+    to Matthew", "1. Mose"). The dropdown and printed reference use these
+    short names instead. CJK names from the translation are already the short
+    titles people expect, so those are kept. Books outside the 66 keep
+    `fallback`, or the id.
+    """
+    if fallback and has_cjk(fallback):
+        return fallback
+    return BOOK_NAMES.get(book_id, fallback or book_id)
+
+
 def is_new_testament(book_id: str) -> bool:
     try:
         return BOOK_ORDER.index(book_id) >= NEW_TESTAMENT_START

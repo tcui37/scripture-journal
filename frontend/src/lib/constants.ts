@@ -1,4 +1,4 @@
-import type { Settings } from "./types";
+import type { ParallelMode, Settings } from "./types";
 
 /** Sheet sizes in CSS pixels at 96dpi, portrait. */
 export const PAGE_SIZES = {
@@ -43,12 +43,15 @@ export const DEFAULT_SETTINGS: Settings = {
   lead: 1.6,
   numbers: "sup",
   flow: "para",
+  poetryIndent: "regular",
   wordsOfChrist: true,
   pageNumbers: true,
   paper: "Ivory",
   justify: true,
   showHeadings: true,
   showChapterNumbers: true,
+  parallelSwap: false,
+  titleLine: false,
 };
 
 export const DEFAULT_REFERENCE = {
@@ -70,6 +73,24 @@ export const ORIENTATION_OPTIONS = [
   { id: "portrait", label: "Portrait" },
   { id: "landscape", label: "Landscape" },
 ] as const;
+
+/** Where the primary translation sits, given the current parallel arrangement. */
+export function parallelSideLabels(
+  mode: ParallelMode,
+  swapped: boolean,
+): { primary: string; compare: string } {
+  const sides: { primary: string; compare: string } =
+    mode === "bands"
+      ? { primary: "Top", compare: "Bottom" }
+      : mode === "stacked"
+        ? { primary: "First", compare: "Second" }
+        : mode === "facing"
+          ? { primary: "Left page", compare: "Right page" }
+          : { primary: "Left", compare: "Right" };
+  return swapped
+    ? { primary: sides.compare, compare: sides.primary }
+    : sides;
+}
 
 export const PARALLEL_OPTIONS = [
   {
@@ -147,6 +168,12 @@ export const NUMBER_OPTIONS = [
 export const FLOW_OPTIONS = [
   { id: "para", label: "Flowing paragraphs" },
   { id: "line", label: "One verse per line" },
+] as const;
+
+export const POETRY_INDENT_OPTIONS = [
+  { id: "off", label: "Off" },
+  { id: "regular", label: "Regular" },
+  { id: "deep", label: "Deep" },
 ] as const;
 
 export const PAPER_OPTIONS = [
