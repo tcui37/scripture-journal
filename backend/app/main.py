@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .catalog import Catalog
 from .clients import Clients
 from .config import get_settings
-from .routers import bible
+from .routers import auth, bible, designs, files
 
 
 @asynccontextmanager
@@ -35,11 +35,15 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 app.include_router(bible.router)
+app.include_router(auth.router)
+app.include_router(designs.router)
+app.include_router(files.router)
 
 
 @app.get("/health")

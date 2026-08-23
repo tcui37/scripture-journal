@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Caprasimo, Figtree, Source_Serif_4 } from "next/font/google";
 
+import AuthProvider from "@/components/AuthProvider";
+
 import "./globals.css";
 
 const heading = Caprasimo({
@@ -35,7 +37,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${heading.variable} ${body.variable} ${serif.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

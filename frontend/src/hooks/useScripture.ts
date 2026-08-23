@@ -293,6 +293,21 @@ export function useScripture(
       const next = { ...reference, ...patch };
       let snap = false;
 
+      // A full book + range (opening a saved file) is applied as-is. The
+      // dropdowns still send one field at a time and keep the snap-to-end
+      // behaviour below.
+      const completeSelection =
+        patch.bookId !== undefined &&
+        patch.startChapter !== undefined &&
+        patch.startVerse !== undefined &&
+        patch.endChapter !== undefined &&
+        patch.endVerse !== undefined;
+      if (completeSelection) {
+        snapEndToLast.current = false;
+        setReferenceState(next);
+        return;
+      }
+
       if (patch.bibleId !== undefined || patch.bookId !== undefined) {
         // A new translation or book may number things differently.
         if (patch.bookId !== undefined) {

@@ -1,5 +1,11 @@
+import { Suspense } from "react";
+
 import JournalApp from "@/components/JournalApp";
 
 export default function Home() {
-  return <JournalApp />;
+  return (
+    <Suspense>
+      <JournalApp />
+    </Suspense>
+  );
 }

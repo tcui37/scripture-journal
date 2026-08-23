@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     request_timeout: float = 20.0
 
+    #: Backend-only. The browser never talks to Supabase.
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+
     #: True when this instance serves only the person running it.
     #:
     #: api.bible's §12 DRM clause obliges a developer to build printing limits

@@ -14,3 +14,7 @@ next-env.d.ts
 
 # os
 .DS_Store
+
+# IDEs
+.cursor/
+.vscode/

@@ -16,12 +16,16 @@ import {
   parallelSideLabels,
 } from "@/lib/constants";
 import type { LimitCheck } from "@/lib/limits";
-import type { PageSize, Settings } from "@/lib/types";
+import type { AuthUser, PageSize, Settings } from "@/lib/types";
 
 import Combobox from "./Combobox";
+import DesignsPanel from "./DesignsPanel";
+import FilesPanel from "./FilesPanel";
 import OptionGroup from "./OptionGroup";
 import Section from "./Section";
 import ToggleList from "./ToggleList";
+
+export type RailView = "design" | "files";
 
 /** Render a notice with its bare URLs as real links. */
 function linkify(text: string) {
@@ -44,6 +48,9 @@ interface SidebarProps {
   openSections: Record<string, boolean>;
   collapsed: boolean;
   limitCheck: LimitCheck;
+  user: AuthUser | null;
+  railView: RailView;
+  onRailViewChange: (view: RailView) => void;
   onSettingsChange: (patch: Partial<Settings>) => void;
   onToggleSection: (id: string, open: boolean) => void;
   onToggle: () => void;
@@ -57,6 +64,9 @@ export default function Sidebar({
   openSections,
   collapsed,
   limitCheck,
+  user,
+  railView,
+  onRailViewChange,
   onSettingsChange,
   onToggleSection,
   onToggle,
@@ -145,9 +155,33 @@ export default function Sidebar({
           </button>
         </div>
         <div className="rail-tagline">A passage, a wide margin, room to write.</div>
+        <div className="rail-mode" role="radiogroup" aria-label="Rail view">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={railView === "design"}
+            className={`opt${railView === "design" ? " is-on" : ""}`}
+            onClick={() => onRailViewChange("design")}
+          >
+            Design
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={railView === "files"}
+            className={`opt${railView === "files" ? " is-on" : ""}`}
+            onClick={() => onRailViewChange("files")}
+          >
+            Files
+          </button>
+        </div>
       </div>
 
       <div className="rail-body">
+        {railView === "files" ? (
+          <FilesPanel />
+        ) : (
+          <>
         <Section
           index="01"
           title="Passage"
@@ -532,6 +566,19 @@ export default function Sidebar({
             onChange={(id, next) => onSettingsChange({ [id]: next })}
           />
         </Section>
+
+        <Section
+          index="05"
+          title="Designs"
+          open={openSections.designs ?? false}
+          onToggle={(open) => onToggleSection("designs", open)}
+        >
+          <div id="rail-designs">
+            <DesignsPanel user={user} settings={settings} onSettingsChange={onSettingsChange} />
+          </div>
+        </Section>
+          </>
+        )}
       </div>
 
       {copyright ? (

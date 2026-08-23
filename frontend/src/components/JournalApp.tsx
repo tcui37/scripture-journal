@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useScripture } from "@/hooks/useScripture";
+import { AccountError, authHref, fetchFile } from "@/lib/account";
 import { uniqueLanguages } from "@/lib/bibles";
 import {
   combineParallelBands,
@@ -25,8 +27,11 @@ import { alignPassages, citationIds, orderedSides } from "@/lib/parallel";
 import { pageDimensions, singleTextGeometry } from "@/lib/render";
 import type { Reference, Settings } from "@/lib/types";
 
+import AppNav, { AccountControl } from "./AppNav";
+import AccountSidecar from "./AccountSidecar";
+import { useAuth } from "./AuthProvider";
 import PageStack from "./PageStack";
-import Sidebar from "./Sidebar";
+import Sidebar, { type RailView } from "./Sidebar";
 
 type ZoomId = (typeof ZOOM_OPTIONS)[number]["id"];
 
@@ -40,10 +45,19 @@ export default function JournalApp() {
   // Settings live in localStorage, which is only readable after mount — gate
   // the data fetches on it so we don't load the defaults then immediately
   // reload the restored reference.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const fileId = searchParams.get("file");
+  const filesOpen = searchParams.get("files") === "1";
+  const accountOpen = searchParams.get("account") === "1";
+  const railView: RailView = filesOpen ? "files" : "design";
+  const { user } = useAuth();
   const [hydrated, setHydrated] = useState(false);
+  const [fileStatus, setFileStatus] = useState("");
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [designFocusToken, setDesignFocusToken] = useState(0);
   const [initial, setInitial] = useState<{
     reference: Reference;
     languages: string[];
@@ -53,7 +67,11 @@ export default function JournalApp() {
   });
 
   const scripture = useScripture(initial.reference, initial.languages, hydrated);
-  const { reference, passage, comparePassage, status, failed } = scripture;
+  const { reference, passage, comparePassage, status, failed, setReference } = scripture;
+  const referenceRef = useRef(reference);
+  const setReferenceRef = useRef(setReference);
+  referenceRef.current = reference;
+  setReferenceRef.current = setReference;
 
   /* ── persistence ─────────────────────────────────────────────────────── */
 
@@ -86,6 +104,42 @@ export default function JournalApp() {
     }
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated || !fileId) return;
+
+    let cancelled = false;
+    fetchFile(fileId)
+      .then((file) => {
+        if (cancelled) return;
+        setSettings(file.design);
+        const { bibleId, compareId } = referenceRef.current;
+        setReferenceRef.current({
+          bibleId,
+          compareId,
+          bookId: file.book_id,
+          startChapter: file.start_chapter,
+          startVerse: file.start_verse,
+          endChapter: file.end_chapter,
+          endVerse: file.end_verse,
+        });
+        setFileStatus("");
+        router.replace("/");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (error instanceof AccountError && error.status === 401) {
+          router.push(authHref("login", "/"));
+          return;
+        }
+        if (error instanceof AccountError && error.status === 404) return;
+        setFileStatus(error instanceof Error ? error.message : "Could not open file");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, fileId, router]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -249,6 +303,42 @@ export default function JournalApp() {
 
   const handleToggleRail = useCallback(() => setRailCollapsed((prev) => !prev), []);
 
+  const handleRailViewChange = useCallback(
+    (view: RailView) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (view === "files") {
+        params.set("files", "1");
+        setRailCollapsed(false);
+      } else {
+        params.delete("files");
+        setDesignFocusToken((token) => token + 1);
+        setOpenSections((prev) => ({ ...prev, designs: true }));
+        setRailCollapsed(false);
+      }
+      const query = params.toString();
+      router.push(query ? `/?${query}` : "/");
+    },
+    [router, searchParams],
+  );
+
+  const handleCloseAccount = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("account");
+    const query = params.toString();
+    router.push(query ? `/?${query}` : "/");
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    if (filesOpen) setRailCollapsed(false);
+  }, [filesOpen]);
+
+  useEffect(() => {
+    if (railView !== "design" || designFocusToken === 0) return;
+    requestAnimationFrame(() => {
+      document.getElementById("rail-designs")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [railView, openSections.designs, designFocusToken]);
+
   /* ── derived ─────────────────────────────────────────────────────────── */
 
   const bookName = scripture.book?.name;
@@ -347,7 +437,7 @@ export default function JournalApp() {
     return `${referenceLabel} · ${chapters} · ${pageCountLabel}`;
   }, [bookName, pages, chapterSpan, referenceLabel, pageCountLabel]);
 
-  const statusText = status || (pages ? pageCountLabel : "");
+  const statusText = fileStatus || status || (pages ? pageCountLabel : "");
 
   return (
     <div className="app">
@@ -362,6 +452,9 @@ export default function JournalApp() {
         openSections={openSections}
         collapsed={railCollapsed}
         limitCheck={limitCheck}
+        user={user}
+        railView={railView}
+        onRailViewChange={handleRailViewChange}
         onSettingsChange={handleSettingsChange}
         onToggleSection={handleToggleSection}
         onToggle={handleToggleRail}
@@ -396,51 +489,62 @@ export default function JournalApp() {
               </button>
             ) : null}
             <div className="topbar-reference">{referenceLabel}</div>
-            <div className={`topbar-status${failed ? " is-error" : ""}`}>{statusText}</div>
+            <div className={`topbar-status${failed || fileStatus ? " is-error" : ""}`}>{statusText}</div>
           </div>
-          <div className="zoom-row">
-            {ZOOM_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={zoom === option.id}
-                className={`zoom${zoom === option.id ? " is-on" : ""}`}
-                onClick={() => setZoom(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="topbar-right">
+            <Suspense>
+              <AppNav />
+            </Suspense>
+            <div className="zoom-row">
+              <label className="zoom-select">
+                <span className="zoom-select-label">Zoom</span>
+                <select
+                  value={zoom}
+                  aria-label="Zoom"
+                  onChange={(event) => setZoom(event.target.value as ZoomId)}
+                >
+                  {ZOOM_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <button
-              type="button"
-              className="download-button"
-              onClick={() => window.print()}
-              disabled={!canPrint}
-              aria-label="Print or save as PDF"
-              title={
-                canPrint
-                  ? `Print / save as PDF — ${pageCountLabel}`
-                  : limitCheck.ok
-                    ? "Nothing to print yet"
-                    : limitCheck.message
-              }
-            >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+              <button
+                type="button"
+                className="download-button"
+                onClick={() => window.print()}
+                disabled={!canPrint}
+                aria-label="Print or save as PDF"
+                title={
+                  canPrint
+                    ? `Print / save as PDF — ${pageCountLabel}`
+                    : limitCheck.ok
+                      ? "Nothing to print yet"
+                      : limitCheck.message
+                }
               >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </button>
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+            </div>
+            <Suspense>
+              <AccountControl />
+            </Suspense>
           </div>
         </div>
 
@@ -460,6 +564,8 @@ export default function JournalApp() {
           ) : null}
         </div>
       </main>
+
+      {accountOpen ? <AccountSidecar onClose={handleCloseAccount} /> : null}
     </div>
   );
 }

@@ -89,7 +89,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const DEFAULT_REFERENCE = {
-  bibleId: "niv",
+  bibleId: "nasb",
   compareId: "",
   bookId: "JHN",
   startChapter: "1",

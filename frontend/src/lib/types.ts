@@ -127,3 +127,41 @@ export interface Reference {
   endChapter: string;
   endVerse: string;
 }
+
+/**
+ * A named page layout: every setting that draws the sheet, excluding
+ * translation. Same fields as `Settings` so applying a Design is a straight
+ * assignment.
+ */
+export type Design = Settings;
+
+export interface DesignRecord {
+  id: string;
+  name: string;
+  settings: Design;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Book/chapter/verse only — translation stays with the live journal. */
+export interface PassageSelection {
+  book_id: string;
+  start_chapter: string;
+  start_verse: string;
+  end_chapter: string;
+  end_verse: string;
+}
+
+/** A saved journal session: passage selection plus a Design snapshot. */
+export interface JournalFile extends PassageSelection {
+  id: string;
+  name: string;
+  design: Design;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
