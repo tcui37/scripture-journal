@@ -67,7 +67,7 @@ export const STORAGE_KEY = "scripture-journal-v3";
 
 export const DEFAULT_SETTINGS: Settings = {
   pageSize: "A4",
-  orientation: "portrait",
+  orientation: "landscape",
   layout: "right",
   parallelMode: "columns",
   lines: "ruled",
@@ -89,13 +89,13 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const DEFAULT_REFERENCE = {
-  bibleId: "nasb",
+  bibleId: "esv",
   compareId: "",
   bookId: "JHN",
-  startChapter: "1",
-  startVerse: "1",
-  endChapter: "1",
-  endVerse: "18",
+  startChapter: "3",
+  startVerse: "16",
+  endChapter: "3",
+  endVerse: "16",
 };
 
 export const PAGE_SIZE_OPTIONS = [

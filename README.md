@@ -11,9 +11,21 @@ sources carry the same text, only the most trusted listing is shown.
 
 ## Layout
 
+Two Vercel projects from this one repo (Root Directory `backend` and
+`frontend`). The FastAPI package stays under `backend/app/`; Vercel only
+needs the thin `backend/api/index.py` entry.
+
 ```
-backend/     FastAPI — holds the API keys, normalises four upstreams
-frontend/    Next.js App Router — page layout, pagination, print styles
+backend/          FastAPI — keys, four upstreams, accounts
+  api/index.py     Vercel ASGI entry; vercel.json rewrites every path here
+  app/             application package (not flattened into api/)
+  .python-version  Python 3.13 on Vercel
+  .vercelignore    .venv, .env, tests, caches
+frontend/         Next.js App Router — layout, pagination, print
+  next.config.ts   rewrites /api/:path* → $API_URL/api/:path* (build-time)
+  .env.example     API_URL
+  .vercelignore    .env, .next, node_modules
+supabase/         SQL migrations for accounts, files, designs
 ```
 
 ### Translation sources
@@ -228,7 +240,8 @@ is present, OCCB and WEBBE switch to it (same slugs: `occb`, `occbt`, `webbe`)
 and helloao copies of those texts are hidden.
 
 ```bash
-cp backend/.env.example backend/.env   # optional; add keys if you have them
+cp backend/.env.example backend/.env       # optional; add keys if you have them
+# cp frontend/.env.example frontend/.env.local   # optional; API_URL defaults to :8000
 ```
 
 Backend:
@@ -237,7 +250,7 @@ Backend:
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-fastapi dev app/main.py               # http://127.0.0.1:8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Frontend, in a second terminal:
@@ -251,36 +264,66 @@ npm run dev                            # http://localhost:3000
 Next.js proxies `/api/*` to the backend, so both run on one origin and the API
 keys never reach the browser. Interactive API docs: <http://127.0.0.1:8000/docs>.
 
-## Configuration
+## Environment variables
 
-`backend/.env`:
+Names only — never commit values. Local files are `backend/.env` and
+`frontend/.env.local` (both gitignored). On Vercel, set the same names in the
+matching project's Environment Variables. `backend/.env` is not uploaded
+(`.gitignore` + `.vercelignore`).
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `API_BIBLE_KEY` | — | api.bible key; its translations are hidden without it |
-| `ESV_API_KEY` | — | Crossway key; the ESV is hidden without it |
-| `API_BIBLE_BASE_URL` | `https://rest.api.bible/v1` | Upstream base URL |
-| `CORS_ORIGINS` | `["http://localhost:3000"]` | JSON array of allowed origins |
-| `REQUEST_TIMEOUT` | `20.0` | Upstream timeout, seconds |
+| Variable | Project | Local | Vercel |
+| --- | --- | --- | --- |
+| `API_BIBLE_KEY` | backend | optional in `.env` | optional; hides api.bible translations if empty |
+| `ESV_API_KEY` | backend | optional in `.env` | optional; hides the ESV if empty |
+| `API_BIBLE_BASE_URL` | backend | default `https://rest.api.bible/v1` | same default |
+| `CORS_ORIGINS` | backend | default `["http://localhost:3000"]` | JSON array of the frontend origin, e.g. `["https://….vercel.app"]` |
+| `REQUEST_TIMEOUT` | backend | default `20.0` | same default |
+| `SUPABASE_URL` | backend | `.env` for accounts / files / designs | required for those features |
+| `SUPABASE_ANON_KEY` | backend | `.env` | required for those features |
+| `SINGLE_USER` | backend | `true` allowed in local `.env` only | **forced `false`** on production and preview, even if set. `vercel dev` (`VERCEL_ENV=development`) is treated as local |
+| `API_URL` | frontend | default `http://127.0.0.1:8000` | API project's URL, **no trailing slash**. Read at **build time** in `next.config.ts` — changing it requires a frontend redeploy |
 
-Point the frontend at a non-default backend with `API_URL`, read by
-`next.config.ts` at startup.
+`SINGLE_USER=true` lifts api.bible's 100-verse print cap for a sole licensee;
+Crossway's ESV cap is never lifted.
 
 ## Deploying to Vercel
 
-Two projects from this one repo.
+Keep **two projects** from this repo. Do not copy local `.env` onto Vercel.
 
-**API** — new project, Root Directory `backend`. Vercel detects `api/index.py`
-and `vercel.json` rewrites every path to it. Set `API_BIBLE_KEY`, `ESV_API_KEY`
-and `CORS_ORIGINS` in the project's environment variables.
+| Project | Root Directory | Framework |
+| --- | --- | --- |
+| API (`scripture-journal-api`) | `backend` | Python (`api/index.py` + `vercel.json` catch-all) |
+| Frontend (`scripture-journal`) | `frontend` | Next.js |
 
-**Frontend** — new project, Root Directory `frontend`, framework Next.js. Set
-`API_URL` to the API project's production URL.
+If the directories are already linked (`backend/.vercel`, `frontend/.vercel`):
+
+```bash
+cd backend && npx vercel --prod
+cd frontend && npx vercel --prod
+```
+
+First time, create the two projects with those Root Directories, then set env
+vars as in the table above. Order, because `API_URL` and `CORS_ORIGINS` point
+at each other:
+
+1. Deploy the API, then copy its production URL.
+2. Set `API_URL` on the frontend project and deploy the frontend.
+3. Set `CORS_ORIGINS` on the API to the frontend origin and redeploy the API.
+
+The browser talks to `/api/…` on the frontend origin; Next.js rewrites
+`/api/:path*` to `${API_URL}/api/:path*`. That is same-origin from the
+browser's point of view, so CORS is not required for the app itself — still
+set it so a direct call to the API origin is allowed.
+
+Warmup: the frontend pings `GET /api/health` so the Python function can
+cold-start. Next does **not** rewrite `/health` on the frontend origin. On the
+API project, `vercel.json` sends every path into FastAPI, so both
+`GET /api/health` and `GET /health` work there.
 
 One caveat: fetching a whole book issues one upstream request per chapter — 150
 for Psalms. That can exceed a serverless function's time limit on smaller
-plans. If whole-book exports time out, either raise the function duration or
-host the backend somewhere always-on.
+plans (Hobby `maxDuration` is 60s). If whole-book exports time out, either
+raise the function duration or host the backend somewhere always-on.
 
 ## Notes
 

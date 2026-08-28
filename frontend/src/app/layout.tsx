@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Caprasimo, Figtree, Source_Serif_4 } from "next/font/google";
 
 import AuthProvider from "@/components/AuthProvider";
@@ -30,6 +30,13 @@ const serif = Source_Serif_4({
 export const metadata: Metadata = {
   title: "Scripture Journal",
   description: "A passage, a wide margin, room to write.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f5ead8",
 };
 
 export default function RootLayout({

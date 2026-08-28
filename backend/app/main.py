@@ -46,6 +46,11 @@ app.include_router(designs.router)
 app.include_router(files.router)
 
 
+# `/api/health` is what the frontend warmup pings: Next only rewrites
+# `/api/:path*` to the FastAPI origin. `/health` is the same check for
+# local probes and for hitting the API origin directly (Vercel rewrites
+# every path on that project into this app).
 @app.get("/health")
+@app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}

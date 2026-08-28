@@ -1,13 +1,26 @@
+import logging
+import os
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+#: Directory that holds `.env` — not the process cwd, which Vercel and tests
+#: may set elsewhere. On Vercel the file is not uploaded; dashboard env wins.
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+
+logger = logging.getLogger(__name__)
+
+#: Vercel production and preview are reachable by others. `vercel dev` sets
+#: VERCEL_ENV=development and is treated as local (SINGLE_USER may be true).
+_VERCEL_SHARED_ENVS = frozenset({"production", "preview"})
 
 
 class Settings(BaseSettings):
     """Application settings, read from the environment or a local .env file."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_BACKEND_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -34,9 +47,24 @@ class Settings(BaseSettings):
     #: subject, so the 100-verse print cap is lifted. Crossway's cap is *not*
     #: lifted by this: it restricts the licensee's own display and storage and
     #: names no end user. Leave this false for anything reachable by others.
+    #:
+    #: Default is false. Local `.env` may set SINGLE_USER=true. Vercel
+    #: production and preview always force false via get_settings().
     single_user: bool = False
+
+
+def _on_vercel_shared_deploy() -> bool:
+    return os.environ.get("VERCEL_ENV", "").strip().lower() in _VERCEL_SHARED_ENVS
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    if _on_vercel_shared_deploy():
+        if settings.single_user:
+            logger.warning(
+                "SINGLE_USER=true is ignored on Vercel production/preview; "
+                "printing caps stay in force."
+            )
+        return settings.model_copy(update={"single_user": False})
+    return settings

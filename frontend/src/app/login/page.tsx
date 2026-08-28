@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 
+import ApiWarmup from "@/components/ApiWarmup";
 import { useAuth } from "@/components/AuthProvider";
 import { authHref, nextLabel, safeNext, signIn } from "@/lib/account";
 
@@ -11,7 +12,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, refresh, apiStatus } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -41,6 +42,7 @@ function LoginForm() {
       <div className="auth-card">
         <p className="auth-eyebrow">Sign in</p>
         <h1 className="auth-heading">Scripture Journal</h1>
+        <ApiWarmup />
         <p className="auth-lead">
           {next === "/"
             ? "Save designs and files to your account."
@@ -68,7 +70,7 @@ function LoginForm() {
             />
           </label>
           {error ? <div className="warning">{error}</div> : null}
-          <button type="submit" className="action-button" disabled={busy}>
+          <button type="submit" className="action-button" disabled={busy || apiStatus === "warming"}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

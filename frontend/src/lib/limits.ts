@@ -81,3 +81,104 @@ export function checkLimits(
 
   return { ...OK, requested };
 }
+
+/** Which licence the cap comes from — used to pick the learn-more copy. */
+export type LicenceSource = "api_bible" | "esv" | "unknown";
+
+export interface LimitExplanation {
+  /** Short version name, e.g. "NIV". */
+  version: string;
+  /** Human source, e.g. "api.bible" or "Crossway". Empty when unknown. */
+  source: string;
+  /** Terms or attribution URL, matching the footer’s bare-domain style. */
+  href: string;
+  hrefLabel: string;
+  /** Concise statement of this translation’s actual rule. */
+  rule: string;
+}
+
+const API_BIBLE_TERMS = "https://api.bible/terms-and-conditions#acceptable_use";
+const ESV_SITE = "https://www.esv.org";
+
+export function versionLabel(bible: BibleSummary | undefined, fallback = ""): string {
+  if (!bible) return fallback;
+  return bible.label.split(" — ")[0]?.trim() || bible.id;
+}
+
+/**
+ * Classify from the cap shape (and the ESV id), not a hardcoded list of
+ * abbreviations — newly curated NIV-like api.bible entries keep working.
+ */
+export function licenceSource(bible: BibleSummary | undefined): LicenceSource {
+  if (!bible?.limits) return "unknown";
+  const { max_verses, max_book_fraction, note } = bible.limits;
+  if (bible.id === "esv" || (max_verses === 500 && max_book_fraction != null)) return "esv";
+  if (max_verses === 100) return "api_bible";
+  const lower = note.toLowerCase();
+  if (lower.includes("crossway")) return "esv";
+  if (lower.includes("api.bible")) return "api_bible";
+  return "unknown";
+}
+
+export function explanationFor(bible: BibleSummary, cap: number): LimitExplanation {
+  const version = versionLabel(bible, bible.id);
+  const kind = licenceSource(bible);
+
+  if (kind === "esv") {
+    return {
+      version,
+      source: "Crossway",
+      href: ESV_SITE,
+      hrefLabel: "esv.org",
+      rule:
+        `${version} is served by Crossway. Their API terms allow at most ` +
+        `500 verses, or half the current book — whichever is smaller. ` +
+        `For this book that is ${cap} verses. Single-chapter books may be shown in full.`,
+    };
+  }
+
+  if (kind === "api_bible") {
+    return {
+      version,
+      source: "api.bible",
+      href: API_BIBLE_TERMS,
+      hrefLabel: "api.bible",
+      rule:
+        `${version} is a copyright-reserved translation from api.bible. ` +
+        `Their terms restrict printing licensed text to 100 verses at a time.`,
+    };
+  }
+
+  return {
+    version,
+    source: "",
+    href: "",
+    hrefLabel: "",
+    rule: bible.limits?.note || `${version} allows at most ${cap} verses at once.`,
+  };
+}
+
+/**
+ * Copy for every selected translation whose cap the current range exceeds.
+ * Uncapped translations are omitted — never invent a limit.
+ */
+export function limitExplanations(
+  bibles: BibleSummary[],
+  ids: string[],
+  book: Book | undefined,
+  reference: Reference,
+): LimitExplanation[] {
+  if (!book) return [];
+  const requested = versesInRange(book, reference);
+  const out: LimitExplanation[] = [];
+
+  for (const id of ids) {
+    if (!id) continue;
+    const bible = bibles.find((entry) => entry.id === id);
+    const cap = allowance(bible, book);
+    if (!bible || cap == null || requested <= cap) continue;
+    out.push(explanationFor(bible, cap));
+  }
+
+  return out;
+}

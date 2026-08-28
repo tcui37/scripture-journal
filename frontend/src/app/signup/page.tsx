@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 
+import ApiWarmup from "@/components/ApiWarmup";
 import { useAuth } from "@/components/AuthProvider";
 import { authHref, nextLabel, safeNext, signUp } from "@/lib/account";
 
@@ -11,7 +12,7 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, refresh, apiStatus } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -68,6 +69,7 @@ function SignupForm() {
           <>
             <p className="auth-eyebrow">Create account</p>
             <h1 className="auth-heading">Scripture Journal</h1>
+            <ApiWarmup />
             <p className="auth-lead">
               Keep named designs and journal files on your account. The journal still works without
               one.
@@ -97,7 +99,7 @@ function SignupForm() {
                 />
               </label>
               {error ? <div className="warning">{error}</div> : null}
-              <button type="submit" className="action-button" disabled={busy}>
+              <button type="submit" className="action-button" disabled={busy || apiStatus === "warming"}>
                 {busy ? "Creating…" : "Create account"}
               </button>
             </form>

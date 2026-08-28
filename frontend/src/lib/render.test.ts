@@ -96,9 +96,9 @@ describe("geometry for lines: none", () => {
 
 describe("pageDimensions", () => {
   it("uses the 96dpi portrait sizes for A5, A6, and half-letter", () => {
-    assert.deepEqual(pageDimensions(settings({ pageSize: "A5" })), PAGE_SIZES.A5);
-    assert.deepEqual(pageDimensions(settings({ pageSize: "A6" })), PAGE_SIZES.A6);
-    assert.deepEqual(pageDimensions(settings({ pageSize: "Half letter" })), PAGE_SIZES["Half letter"]);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "A5", orientation: "portrait" })), PAGE_SIZES.A5);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "A6", orientation: "portrait" })), PAGE_SIZES.A6);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "Half letter", orientation: "portrait" })), PAGE_SIZES["Half letter"]);
     assert.equal(PAGE_SIZES.A5.width, 559);
     assert.equal(PAGE_SIZES.A5.height, 794);
     assert.equal(PAGE_SIZES.A6.width, 397);
@@ -108,16 +108,16 @@ describe("pageDimensions", () => {
   });
 
   it("swaps A5 for landscape", () => {
-    const portrait = pageDimensions(settings({ pageSize: "A5" }));
+    const portrait = pageDimensions(settings({ pageSize: "A5", orientation: "portrait" }));
     const landscape = pageDimensions(settings({ pageSize: "A5", orientation: "landscape" }));
     assert.equal(landscape.width, portrait.height);
     assert.equal(landscape.height, portrait.width);
   });
 
   it("uses the 96dpi portrait sizes for A3, B5, and B6", () => {
-    assert.deepEqual(pageDimensions(settings({ pageSize: "A3" })), PAGE_SIZES.A3);
-    assert.deepEqual(pageDimensions(settings({ pageSize: "B5" })), PAGE_SIZES.B5);
-    assert.deepEqual(pageDimensions(settings({ pageSize: "B6" })), PAGE_SIZES.B6);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "A3", orientation: "portrait" })), PAGE_SIZES.A3);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "B5", orientation: "portrait" })), PAGE_SIZES.B5);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "B6", orientation: "portrait" })), PAGE_SIZES.B6);
     assert.equal(PAGE_SIZES.A3.width, 1123);
     assert.equal(PAGE_SIZES.A3.height, 1587);
     assert.equal(PAGE_SIZES.B5.width, 665);
@@ -127,9 +127,9 @@ describe("pageDimensions", () => {
   });
 
   it("uses the 96dpi portrait sizes for tabloid, executive, and 6 × 9", () => {
-    assert.deepEqual(pageDimensions(settings({ pageSize: "Tabloid" })), PAGE_SIZES.Tabloid);
-    assert.deepEqual(pageDimensions(settings({ pageSize: "Executive" })), PAGE_SIZES.Executive);
-    assert.deepEqual(pageDimensions(settings({ pageSize: "6 × 9 in" })), PAGE_SIZES["6 × 9 in"]);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "Tabloid", orientation: "portrait" })), PAGE_SIZES.Tabloid);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "Executive", orientation: "portrait" })), PAGE_SIZES.Executive);
+    assert.deepEqual(pageDimensions(settings({ pageSize: "6 × 9 in", orientation: "portrait" })), PAGE_SIZES["6 × 9 in"]);
     assert.equal(PAGE_SIZES.Tabloid.width, 1056);
     assert.equal(PAGE_SIZES.Tabloid.height, 1632);
     assert.equal(PAGE_SIZES.Executive.width, 696);
@@ -177,7 +177,7 @@ describe("textShare", () => {
   });
 
   it("still lays out A5 with a writing area", () => {
-    const geo = geometry(settings({ pageSize: "A5", layout: "right" }));
+    const geo = geometry(settings({ pageSize: "A5", layout: "right", orientation: "portrait" }));
     assert.equal(geo.page.width, 559);
     assert.ok((geo.slots[0]?.width ?? 0) > 0);
     assert.ok((geo.lineBoxes[0]?.width ?? 0) > 0);

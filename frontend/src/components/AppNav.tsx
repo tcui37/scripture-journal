@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { authHref } from "@/lib/account";
 
+import ApiWarmup from "./ApiWarmup";
 import { useAuth } from "./AuthProvider";
 
 function accountHref(searchParams: URLSearchParams, accountOpen: boolean): string {
@@ -90,6 +91,7 @@ export default function AppNav() {
         <Link href="/" className={`app-nav-tab${onJournal ? " is-on" : ""}`}>
           Journal
         </Link>
+        <ApiWarmup />
       </div>
     </nav>
   );

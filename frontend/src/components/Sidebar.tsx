@@ -21,6 +21,7 @@ import type { AuthUser, PageSize, Settings } from "@/lib/types";
 import Combobox from "./Combobox";
 import DesignsPanel from "./DesignsPanel";
 import FilesPanel from "./FilesPanel";
+import LimitsLearnMore from "./LimitsLearnMore";
 import OptionGroup from "./OptionGroup";
 import Section from "./Section";
 import ToggleList from "./ToggleList";
@@ -370,7 +371,12 @@ export default function Sidebar({
             </button>
           </div>
 
-          {!limitCheck.ok ? <div className="warning">{limitCheck.message}</div> : null}
+          {!limitCheck.ok ? (
+            <div className="warning">
+              {limitCheck.message}{" "}
+              <LimitsLearnMore bibles={bibles} book={book} reference={reference} />
+            </div>
+          ) : null}
           {limitCheck.ok && summary ? <div className="summary">{summary}</div> : null}
         </Section>
 

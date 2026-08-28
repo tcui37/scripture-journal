@@ -1,5 +1,6 @@
 # secrets
 .env
+.env.local
 
 # python
 .venv/
@@ -18,3 +19,6 @@ next-env.d.ts
 # IDEs
 .cursor/
 .vscode/
+
+# Vercel CLI link metadata
+.vercel/

@@ -20,6 +20,7 @@ import {
   STORAGE_KEY,
   ZOOM_OPTIONS,
 } from "@/lib/constants";
+import { fitPreviewScale, narrowUiQuery, startRailCollapsed } from "@/lib/layout";
 import { printFilename } from "@/lib/filename";
 import { checkLimits } from "@/lib/limits";
 import { Measurer, paginate } from "@/lib/paginate";
@@ -51,12 +52,12 @@ export default function JournalApp() {
   const filesOpen = searchParams.get("files") === "1";
   const accountOpen = searchParams.get("account") === "1";
   const railView: RailView = filesOpen ? "files" : "design";
-  const { user } = useAuth();
+  const { user, apiStatus } = useAuth();
   const [hydrated, setHydrated] = useState(false);
   const [fileStatus, setFileStatus] = useState("");
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(true);
   const [designFocusToken, setDesignFocusToken] = useState(0);
   const [initial, setInitial] = useState<{
     reference: Reference;
@@ -66,7 +67,11 @@ export default function JournalApp() {
     languages: ["eng"],
   });
 
-  const scripture = useScripture(initial.reference, initial.languages, hydrated);
+  const scripture = useScripture(
+    initial.reference,
+    initial.languages,
+    hydrated && apiStatus !== "warming",
+  );
   const { reference, passage, comparePassage, status, failed, setReference } = scripture;
   const referenceRef = useRef(reference);
   const setReferenceRef = useRef(setReference);
@@ -76,6 +81,7 @@ export default function JournalApp() {
   /* ── persistence ─────────────────────────────────────────────────────── */
 
   useEffect(() => {
+    let storedRail: boolean | undefined;
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -90,7 +96,7 @@ export default function JournalApp() {
         };
         if (parsed.settings) setSettings((prev) => ({ ...prev, ...parsed.settings }));
         if (parsed.openSections) setOpenSections(parsed.openSections);
-        if (typeof parsed.railCollapsed === "boolean") setRailCollapsed(parsed.railCollapsed);
+        if (typeof parsed.railCollapsed === "boolean") storedRail = parsed.railCollapsed;
         setInitial({
           reference: { ...DEFAULT_REFERENCE, ...parsed.reference },
           languages: uniqueLanguages(
@@ -102,11 +108,14 @@ export default function JournalApp() {
     } catch {
       // Unreadable storage just means we start from the defaults.
     }
+    const filesRequested = new URLSearchParams(window.location.search).get("files") === "1";
+    const narrow = window.matchMedia(narrowUiQuery()).matches;
+    setRailCollapsed(startRailCollapsed(narrow, filesRequested, storedRail));
     setHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (!hydrated || !fileId) return;
+    if (!hydrated || !fileId || apiStatus === "warming") return;
 
     let cancelled = false;
     fetchFile(fileId)
@@ -139,7 +148,7 @@ export default function JournalApp() {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, fileId, router]);
+  }, [hydrated, fileId, router, apiStatus]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -280,8 +289,7 @@ export default function JournalApp() {
     const desk = deskRef.current;
     if (!desk) return;
 
-    const update = () =>
-      setScale(Math.min(1, Math.max(0.25, (desk.clientWidth - 90) / sheet.width)));
+    const update = () => setScale(fitPreviewScale(desk.clientWidth, sheet.width));
 
     update();
     const observer = new ResizeObserver(update);
@@ -331,6 +339,17 @@ export default function JournalApp() {
   useEffect(() => {
     if (filesOpen) setRailCollapsed(false);
   }, [filesOpen]);
+
+  useEffect(() => {
+    if (railCollapsed) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (!window.matchMedia(narrowUiQuery()).matches) return;
+      setRailCollapsed(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [railCollapsed]);
 
   useEffect(() => {
     if (railView !== "design" || designFocusToken === 0) return;
@@ -460,6 +479,15 @@ export default function JournalApp() {
         onToggle={handleToggleRail}
       />
 
+      {!railCollapsed ? (
+        <button
+          type="button"
+          className="rail-backdrop"
+          aria-label="Close settings"
+          onClick={handleToggleRail}
+        />
+      ) : null}
+
       <main className="desk" ref={deskRef}>
         <div className="topbar">
           <div className="topbar-left">
@@ -485,11 +513,15 @@ export default function JournalApp() {
                 >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
-                Show settings
+                Settings
               </button>
             ) : null}
-            <div className="topbar-reference">{referenceLabel}</div>
-            <div className={`topbar-status${failed || fileStatus ? " is-error" : ""}`}>{statusText}</div>
+            <div className="topbar-copy">
+              <div className="topbar-reference">{referenceLabel}</div>
+              <div className={`topbar-status${failed || fileStatus ? " is-error" : ""}`}>
+                {statusText}
+              </div>
+            </div>
           </div>
           <div className="topbar-right">
             <Suspense>
@@ -549,19 +581,21 @@ export default function JournalApp() {
         </div>
 
         <div className="desk-inner">
-          {pages ? (
-            <PageStack
-              pages={pages}
-              settings={settings}
-              reference={referenceLabel}
-              citation={citation}
-              sources={sources}
-              copyright={copyright}
-              scale={scale}
-              interleaveBlanks={blanks}
-              layout={pageLayout}
-            />
-          ) : null}
+          <div className={`preview-scroll${zoom === "fit" ? " is-fit" : ""}`}>
+            {pages ? (
+              <PageStack
+                pages={pages}
+                settings={settings}
+                reference={referenceLabel}
+                citation={citation}
+                sources={sources}
+                copyright={copyright}
+                scale={scale}
+                interleaveBlanks={blanks}
+                layout={pageLayout}
+              />
+            ) : null}
+          </div>
         </div>
       </main>
 
