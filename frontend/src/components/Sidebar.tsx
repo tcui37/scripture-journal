@@ -1,4 +1,5 @@
 import type { Scripture } from "@/hooks/useScripture";
+import { APP_TAGLINE } from "@/lib/constants";
 import {
   FLOW_OPTIONS,
   FONT_OPTIONS,
@@ -13,10 +14,9 @@ import {
   TEXT_SHARE_MAX,
   TEXT_SHARE_MIN,
   TEXT_TOGGLES,
-  parallelSideLabels,
 } from "@/lib/constants";
 import type { LimitCheck } from "@/lib/limits";
-import type { AuthUser, PageSize, Settings } from "@/lib/types";
+import type { AuthUser, JournalFile, PageSize, Reference, Settings } from "@/lib/types";
 
 import Combobox from "./Combobox";
 import DesignsPanel from "./DesignsPanel";
@@ -44,6 +44,7 @@ function linkify(text: string) {
 interface SidebarProps {
   scripture: Scripture;
   settings: Settings;
+  reference: Reference;
   summary: string;
   copyright: string;
   openSections: Record<string, boolean>;
@@ -51,10 +52,13 @@ interface SidebarProps {
   limitCheck: LimitCheck;
   user: AuthUser | null;
   railView: RailView;
+  activeLibraryFile: JournalFile | null;
   onRailViewChange: (view: RailView) => void;
   onSettingsChange: (patch: Partial<Settings>) => void;
   onToggleSection: (id: string, open: boolean) => void;
   onToggle: () => void;
+  onOpenFile: (file: JournalFile) => void;
+  onActiveLibraryFileChange: (file: JournalFile | null) => void;
 }
 
 export default function Sidebar({
@@ -67,10 +71,13 @@ export default function Sidebar({
   limitCheck,
   user,
   railView,
+  activeLibraryFile,
   onRailViewChange,
   onSettingsChange,
   onToggleSection,
   onToggle,
+  onOpenFile,
+  onActiveLibraryFileChange,
 }: SidebarProps) {
   const {
     languages,
@@ -93,7 +100,6 @@ export default function Sidebar({
   const multilingual = selectedLanguages.length > 1;
   const selectedLanguageSet = new Set(selectedLanguages);
   const comparing = Boolean(reference.compareId);
-  const sides = parallelSideLabels(settings.parallelMode, settings.parallelSwap);
 
   const withLanguage = (bible: (typeof bibles)[number]) =>
     multilingual ? `${bible.label} · ${bible.language_name}` : bible.label;
@@ -173,7 +179,7 @@ export default function Sidebar({
             Hide
           </button>
         </div>
-        <div className="rail-tagline">A passage, a wide margin, room to write.</div>
+        <div className="rail-tagline">{APP_TAGLINE}</div>
         {user ? (
           <div className="rail-mode" role="radiogroup" aria-label="Rail view">
             <button
@@ -199,9 +205,22 @@ export default function Sidebar({
       </div>
 
       <div className="rail-body">
-        {user && railView === "files" ? (
-          <FilesPanel />
-        ) : (
+        {user ? (
+          <div hidden={railView !== "files"} aria-hidden={railView !== "files" || undefined}>
+            <FilesPanel
+              reference={reference}
+              settings={settings}
+              bookName={book?.name}
+              activeLibraryFile={activeLibraryFile}
+              onOpenFile={onOpenFile}
+              onActiveLibraryFileChange={onActiveLibraryFileChange}
+            />
+          </div>
+        ) : null}
+        <div
+          hidden={Boolean(user && railView === "files")}
+          aria-hidden={user && railView === "files" ? true : undefined}
+        >
           <>
         <Section
           title="Passage"
@@ -209,10 +228,7 @@ export default function Sidebar({
           onToggle={(open) => onToggleSection("passage", open)}
         >
           <div className="control">
-            <div className="control-label">
-              Languages
-              <span className="control-value">{selectedLanguages.length || ""}</span>
-            </div>
+            <div className="control-label">Languages</div>
             {languageOptions.length ? (
               <Combobox
                 label="Add a language"
@@ -242,12 +258,7 @@ export default function Sidebar({
           </div>
 
           <div className="control">
-            <div className="control-label">
-              Translation
-              <span className="control-value">
-                {comparing ? sides.primary : bibles.length || ""}
-              </span>
-            </div>
+            <div className="control-label">Translation</div>
             <Combobox
               label="Translation"
               options={translationOptions}
@@ -262,10 +273,7 @@ export default function Sidebar({
             <summary>Second translation</summary>
             <div className="advanced-body">
               <div className="control">
-                <div className="control-label">
-                  Compare with
-                  {comparing ? <span className="control-value">{sides.compare}</span> : null}
-                </div>
+                <div className="control-label">Compare with</div>
                 <Combobox
                   label="Compare with a second translation"
                   options={compareOptions}
@@ -368,10 +376,10 @@ export default function Sidebar({
           </div>
 
           <div className="quick-row">
-            <button type="button" className="link-button" onClick={wholeChapter} disabled={!book}>
+            <button type="button" className="btn btn-secondary" onClick={wholeChapter} disabled={!book}>
               Whole chapter
             </button>
-            <button type="button" className="link-button" onClick={entireBook} disabled={!book}>
+            <button type="button" className="btn btn-secondary" onClick={entireBook} disabled={!book}>
               Entire book
             </button>
           </div>
@@ -573,7 +581,6 @@ export default function Sidebar({
           />
         </Section>
 
-        {user ? (
         <Section
           title="Designs"
           open={openSections.designs ?? false}
@@ -581,9 +588,8 @@ export default function Sidebar({
         >
           <DesignsPanel user={user} settings={settings} onSettingsChange={onSettingsChange} />
         </Section>
-        ) : null}
           </>
-        )}
+        </div>
 
         {copyright ? (
           <div className="rail-footer">

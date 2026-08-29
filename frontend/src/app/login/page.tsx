@@ -85,7 +85,7 @@ function LoginForm() {
               {error}
             </div>
           ) : null}
-          <button type="submit" className="action-button" disabled={busy || apiStatus !== "ok"}>
+          <button type="submit" className="btn btn-primary btn-block" disabled={busy || apiStatus !== "ok"}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

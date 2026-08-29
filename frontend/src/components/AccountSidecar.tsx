@@ -8,14 +8,19 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
 interface AccountSidecarProps {
+  open: boolean;
   onClose: () => void;
 }
 
-export default function AccountSidecar({ onClose }: AccountSidecarProps) {
+export default function AccountSidecar({ open, onClose }: AccountSidecarProps) {
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
+    if (!open) return;
+
     const panel = panelRef.current;
     const previously = document.activeElement as HTMLElement | null;
 
@@ -29,7 +34,7 @@ export default function AccountSidecar({ onClose }: AccountSidecarProps) {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -51,23 +56,27 @@ export default function AccountSidecar({ onClose }: AccountSidecarProps) {
       window.removeEventListener("keydown", onKey);
       if (previously && document.contains(previously)) previously.focus();
     };
-  }, [onClose]);
+  }, [open]);
 
   return (
     <>
       <button
         type="button"
-        className="sidecar-backdrop"
+        className={`sidecar-backdrop${open ? " is-open" : ""}`}
         aria-label="Close account"
+        aria-hidden={!open}
+        tabIndex={open ? 0 : -1}
         onClick={onClose}
       />
       <aside
         ref={panelRef}
         id="account-sidecar"
-        className="sidecar"
+        className={`sidecar${open ? " is-open" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-sidecar-title"
+        aria-hidden={!open}
+        {...(!open ? { inert: true } : {})}
       >
         <div className="sidecar-header">
           <div className="sidecar-heading">

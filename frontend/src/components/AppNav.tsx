@@ -1,29 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { authHref } from "@/lib/account";
 
 import ApiWarmup from "./ApiWarmup";
 import { useAuth } from "./AuthProvider";
-
-function accountHref(searchParams: URLSearchParams, accountOpen: boolean): string {
-  const params = new URLSearchParams(searchParams.toString());
-  params.delete("account");
-  if (!accountOpen) params.set("account", "1");
-  const query = params.toString();
-  return query ? `/?${query}` : "/";
-}
+import { useJournalUi } from "./JournalUiContext";
 
 /** Account icon (signed in) or Sign in link (guest). */
 export function AccountControl() {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const journalUi = useJournalUi();
   const { user, loading, apiStatus } = useAuth();
   const onJournal = pathname === "/";
-  const accountOpen = onJournal && searchParams.get("account") === "1";
+  const accountOpen = onJournal && Boolean(journalUi?.accountOpen);
   const signInNext = accountOpen ? "/?account=1" : "/";
 
   // Hide until /me has run against a live API so guests never flash an account
@@ -48,7 +40,7 @@ export function AccountControl() {
         aria-label={accountOpen ? "Close account" : "Account"}
         aria-expanded={accountOpen}
         aria-controls="account-sidecar"
-        onClick={() => router.push(accountHref(searchParams, accountOpen))}
+        onClick={() => journalUi?.toggleAccount()}
       >
         <AccountIcon />
         Account

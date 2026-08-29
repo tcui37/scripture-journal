@@ -12,10 +12,10 @@ export default function GuestPrompt({ next, message }: GuestPromptProps) {
     <div className="guest-prompt">
       <p className="panel-note">{message}</p>
       <div className="record-actions">
-        <Link href={authHref("login", next)} className="action-button action-button-inline">
+        <Link href={authHref("login", next)} className="btn btn-primary btn-inline">
           Sign in
         </Link>
-        <Link href={authHref("signup", next)} className="link-button">
+        <Link href={authHref("signup", next)} className="btn btn-secondary">
           Create account
         </Link>
       </div>

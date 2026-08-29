@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Caprasimo, Figtree, Source_Serif_4 } from "next/font/google";
 
 import AuthProvider from "@/components/AuthProvider";
+import { APP_TAGLINE } from "@/lib/constants";
 
 import "./globals.css";
 
@@ -29,7 +30,7 @@ const serif = Source_Serif_4({
 
 export const metadata: Metadata = {
   title: "Scripture Journal",
-  description: "A passage, a wide margin, room to write.",
+  description: APP_TAGLINE,
 };
 
 export const viewport: Viewport = {

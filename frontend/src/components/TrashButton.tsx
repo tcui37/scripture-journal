@@ -16,7 +16,7 @@ export default function TrashButton({
   return (
     <button
       type="button"
-      className={`icon-button${confirming ? " is-danger is-label" : ""}`}
+      className={`icon-btn${confirming ? " is-danger is-label" : ""}`}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}

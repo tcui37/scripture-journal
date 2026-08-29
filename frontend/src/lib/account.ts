@@ -1,4 +1,9 @@
-import { DEFAULT_REFERENCE, DEFAULT_SETTINGS } from "./constants";
+import {
+  BUILTIN_DEFAULT_DESIGN_ID,
+  DEFAULT_DESIGN_NAME,
+  DEFAULT_REFERENCE,
+  DEFAULT_SETTINGS,
+} from "./constants";
 import type {
   AuthUser,
   Design,
@@ -161,7 +166,7 @@ export async function fetchFile(id: string) {
   return sendJson<JournalFile>(`/api/files/${id}`);
 }
 
-export async function createFile(body: {
+export type FileWriteBody = {
   name: string;
   book_id: string;
   start_chapter: string;
@@ -169,8 +174,14 @@ export async function createFile(body: {
   end_chapter: string;
   end_verse: string;
   design: Design;
-}) {
+};
+
+export async function createFile(body: FileWriteBody) {
   return sendJson<JournalFile>("/api/files", { method: "POST", body });
+}
+
+export async function updateFile(id: string, body: Partial<FileWriteBody>) {
+  return sendJson<JournalFile>(`/api/files/${id}`, { method: "PATCH", body });
 }
 
 export async function deleteFile(id: string) {
@@ -217,13 +228,116 @@ export function nextLabel(path: string): string {
   }
 }
 
-export function formatPassageLabel(selection: PassageSelection): string {
-  const { book_id, start_chapter, start_verse, end_chapter, end_verse } = selection;
+/** USFM book id → usual English short title (matches backend canon). */
+const BOOK_NAMES: Record<string, string> = {
+  GEN: "Genesis",
+  EXO: "Exodus",
+  LEV: "Leviticus",
+  NUM: "Numbers",
+  DEU: "Deuteronomy",
+  JOS: "Joshua",
+  JDG: "Judges",
+  RUT: "Ruth",
+  "1SA": "1 Samuel",
+  "2SA": "2 Samuel",
+  "1KI": "1 Kings",
+  "2KI": "2 Kings",
+  "1CH": "1 Chronicles",
+  "2CH": "2 Chronicles",
+  EZR: "Ezra",
+  NEH: "Nehemiah",
+  EST: "Esther",
+  JOB: "Job",
+  PSA: "Psalms",
+  PRO: "Proverbs",
+  ECC: "Ecclesiastes",
+  SNG: "Song of Solomon",
+  ISA: "Isaiah",
+  JER: "Jeremiah",
+  LAM: "Lamentations",
+  EZK: "Ezekiel",
+  DAN: "Daniel",
+  HOS: "Hosea",
+  JOL: "Joel",
+  AMO: "Amos",
+  OBA: "Obadiah",
+  JON: "Jonah",
+  MIC: "Micah",
+  NAM: "Nahum",
+  HAB: "Habakkuk",
+  ZEP: "Zephaniah",
+  HAG: "Haggai",
+  ZEC: "Zechariah",
+  MAL: "Malachi",
+  MAT: "Matthew",
+  MRK: "Mark",
+  LUK: "Luke",
+  JHN: "John",
+  ACT: "Acts",
+  ROM: "Romans",
+  "1CO": "1 Corinthians",
+  "2CO": "2 Corinthians",
+  GAL: "Galatians",
+  EPH: "Ephesians",
+  PHP: "Philippians",
+  COL: "Colossians",
+  "1TH": "1 Thessalonians",
+  "2TH": "2 Thessalonians",
+  "1TI": "1 Timothy",
+  "2TI": "2 Timothy",
+  TIT: "Titus",
+  PHM: "Philemon",
+  HEB: "Hebrews",
+  JAS: "James",
+  "1PE": "1 Peter",
+  "2PE": "2 Peter",
+  "1JN": "1 John",
+  "2JN": "2 John",
+  "3JN": "3 John",
+  JUD: "Jude",
+  REV: "Revelation",
+};
+
+export function bookDisplayName(bookId: string, fallback?: string): string {
+  return BOOK_NAMES[bookId] ?? fallback ?? bookId;
+}
+
+function formatPassageWithBook(
+  bookLabel: string,
+  selection: Pick<PassageSelection, "start_chapter" | "start_verse" | "end_chapter" | "end_verse">,
+): string {
+  const { start_chapter, start_verse, end_chapter, end_verse } = selection;
   if (start_chapter === end_chapter) {
     const range = end_verse !== start_verse ? `–${end_verse}` : "";
-    return `${book_id} ${start_chapter}:${start_verse}${range}`;
+    return `${bookLabel} ${start_chapter}:${start_verse}${range}`;
   }
-  return `${book_id} ${start_chapter}:${start_verse}–${end_chapter}:${end_verse}`;
+  return `${bookLabel} ${start_chapter}:${start_verse}–${end_chapter}:${end_verse}`;
+}
+
+/** Compact label using USFM book ids — for APIs and storage. */
+export function formatPassageLabel(selection: PassageSelection): string {
+  return formatPassageWithBook(selection.book_id, selection);
+}
+
+/** Human-readable passage label for UI copy. */
+export function formatPassageDisplay(selection: PassageSelection, bookName?: string): string {
+  const bookLabel = bookName?.trim() || bookDisplayName(selection.book_id);
+  return formatPassageWithBook(bookLabel, selection);
+}
+
+/** Suggested library file name from the current passage. */
+export function defaultLibraryFileName(selection: PassageSelection, bookName?: string): string {
+  return `${formatPassageDisplay(selection, bookName)} notes`;
+}
+
+export function passageFromReference(reference: Reference): PassageSelection {
+  return {
+    book_id: reference.bookId,
+    start_chapter: reference.startChapter,
+    start_verse: reference.startVerse,
+    end_chapter: reference.endChapter,
+    end_verse: reference.endVerse,
+  };
 }
 
 export function sameDesign(left: Design, right: Design): boolean {
@@ -236,6 +350,47 @@ export function sameDesign(left: Design, right: Design): boolean {
 
 export function newestFirst<T extends { created_at: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+}
+
+/** Factory layout preset listed in Designs for every user without a DB row. */
+export function builtinDefaultDesign(): Pick<DesignRecord, "id" | "name" | "settings"> {
+  return {
+    id: BUILTIN_DEFAULT_DESIGN_ID,
+    name: DEFAULT_DESIGN_NAME,
+    settings: DEFAULT_SETTINGS,
+  };
+}
+
+/** Build a live reference from a saved file and the current translations. */
+export function referenceFromJournalFile(
+  file: JournalFile,
+  bibleId: string,
+  compareId: string,
+): Reference {
+  return {
+    bibleId,
+    compareId,
+    bookId: file.book_id,
+    startChapter: file.start_chapter,
+    startVerse: file.start_verse,
+    endChapter: file.end_chapter,
+    endVerse: file.end_verse,
+  };
+}
+
+/** Apply a saved file's passage and layout; keep live translation ids. */
+export function journalFileState(
+  file: JournalFile,
+  currentReference: Reference,
+): { settings: Settings; reference: Reference } {
+  return {
+    settings: file.design,
+    reference: referenceFromJournalFile(
+      file,
+      currentReference.bibleId,
+      currentReference.compareId,
+    ),
+  };
 }
 
 /** Build a file POST body from the journal snapshot in localStorage. No translations. */

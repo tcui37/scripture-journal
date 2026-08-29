@@ -12,21 +12,16 @@ import {
 } from "react";
 
 import { useScripture } from "@/hooks/useScripture";
-import { AccountError, authHref, fetchFile } from "@/lib/account";
+import { AccountError, authHref, fetchFile, journalFileState } from "@/lib/account";
+import { readJournalPanelsFromSearch, syncJournalUrl } from "@/lib/journal-url";
 import { uniqueLanguages } from "@/lib/bibles";
 import {
-  combineParallelBands,
-  combineParallelColumns,
-  paragraphBlocks,
-  PARALLEL_GAP,
-  parallelBlocks,
-} from "@/lib/blocks";
-import {
+  clampZoom,
   cssPageSize,
   DEFAULT_REFERENCE,
   DEFAULT_SETTINGS,
   STORAGE_KEY,
-  ZOOM_OPTIONS,
+  ZOOM_WHEEL_STEP,
 } from "@/lib/constants";
 import {
   fitPreviewScale,
@@ -36,21 +31,24 @@ import {
 } from "@/lib/layout";
 import { printFilename } from "@/lib/filename";
 import { checkLimits } from "@/lib/limits";
-import { Measurer, paginate } from "@/lib/paginate";
-import { alignPassages, citationIds, orderedSides } from "@/lib/parallel";
+import {
+  formatPageCountLabel,
+  paginatePassages,
+  printedPageCount,
+} from "@/lib/pages";
+import { Measurer } from "@/lib/paginate";
+import { citationIds, orderedSides } from "@/lib/parallel";
 import { pageDimensions, singleTextGeometry } from "@/lib/render";
-import type { Reference, Settings } from "@/lib/types";
+import type { JournalFile, Reference, Settings } from "@/lib/types";
 
 import AppNav, { AccountControl } from "./AppNav";
 import AccountSidecar from "./AccountSidecar";
 import { useAuth } from "./AuthProvider";
-import Combobox from "./Combobox";
+import { JournalUiProvider } from "./JournalUiContext";
+import { useLibrary } from "./LibraryProvider";
 import PageStack from "./PageStack";
 import Sidebar, { type RailView } from "./Sidebar";
-
-type ZoomId = (typeof ZOOM_OPTIONS)[number]["id"];
-
-const ZOOM_IDS: ZoomId[] = ZOOM_OPTIONS.map((option) => option.id);
+import ZoomControl from "./ZoomControl";
 
 /** Trimmed, de-duplicated, empties dropped — for assembling licence notices. */
 const unique = (parts: (string | undefined)[]) =>
@@ -64,15 +62,18 @@ export default function JournalApp() {
   // reload the restored reference.
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fileId = searchParams.get("file");
-  const filesRequested = searchParams.get("files") === "1";
-  const accountOpen = searchParams.get("account") === "1";
+  const landingPanels = readJournalPanelsFromSearch(searchParams);
+  const pendingFileIdRef = useRef(landingPanels.fileId);
   const { user, loading, apiStatus } = useAuth();
+  const { getCachedFile, cacheFile } = useLibrary();
+  const [filesOpen, setFilesOpen] = useState(landingPanels.files);
+  const [accountOpen, setAccountOpen] = useState(landingPanels.account);
   // Hide Files until the session is known so guests never flash that panel.
-  const filesOpen = Boolean(user) && filesRequested;
-  const railView: RailView = filesOpen ? "files" : "design";
+  const filesPanelOpen = Boolean(user) && filesOpen;
+  const railView: RailView = filesPanelOpen ? "files" : "design";
   const [hydrated, setHydrated] = useState(false);
   const [fileStatus, setFileStatus] = useState("");
+  const [activeLibraryFile, setActiveLibraryFile] = useState<JournalFile | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [railCollapsed, setRailCollapsed] = useState(true);
@@ -139,25 +140,32 @@ export default function JournalApp() {
   }, []);
 
   useEffect(() => {
+    const fileId = pendingFileIdRef.current;
     if (!hydrated || !fileId || apiStatus !== "ok") return;
 
+    pendingFileIdRef.current = null;
     let cancelled = false;
+
+    const applyFile = (file: JournalFile) => {
+      if (cancelled) return;
+      const next = journalFileState(file, referenceRef.current);
+      setSettings(next.settings);
+      setReferenceRef.current(next.reference);
+      setActiveLibraryFile(file);
+      setFileStatus("");
+      cacheFile(file);
+      syncJournalUrl({ file: null });
+    };
+
+    const cached = getCachedFile(fileId);
+    if (cached) {
+      applyFile(cached);
+      return;
+    }
+
     fetchFile(fileId)
       .then((file) => {
-        if (cancelled) return;
-        setSettings(file.design);
-        const { bibleId, compareId } = referenceRef.current;
-        setReferenceRef.current({
-          bibleId,
-          compareId,
-          bookId: file.book_id,
-          startChapter: file.start_chapter,
-          startVerse: file.start_verse,
-          endChapter: file.end_chapter,
-          endVerse: file.end_verse,
-        });
-        setFileStatus("");
-        router.replace("/");
+        applyFile(file);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -172,7 +180,19 @@ export default function JournalApp() {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, fileId, router, apiStatus]);
+  }, [hydrated, apiStatus, getCachedFile, cacheFile, router]);
+
+  const handleOpenFile = useCallback(
+    (file: JournalFile) => {
+      const next = journalFileState(file, referenceRef.current);
+      setSettings(next.settings);
+      setReferenceRef.current(next.reference);
+      setActiveLibraryFile(file);
+      setFileStatus("");
+      cacheFile(file);
+    },
+    [cacheFile],
+  );
 
   useEffect(() => {
     if (!hydrated) return;
@@ -238,73 +258,8 @@ export default function JournalApp() {
   const pages = useMemo(() => {
     const measurer = measurerRef.current;
     if (!measureReady || !measurer || !primaryPassage) return null;
-
-    if (!parallel || !secondaryPassage) {
-      return paginate(paragraphBlocks(primaryPassage.paragraphs, settings), settings, measurer);
-    }
-
-    if (facing) {
-      // One translation per sheet: paginate each, then interleave so the pair
-      // for a given stretch of text lands on facing pages.
-      const left = paginate(
-        paragraphBlocks(primaryPassage.paragraphs, settings),
-        settings,
-        measurer,
-      );
-      const right = paginate(
-        paragraphBlocks(secondaryPassage.paragraphs, settings),
-        settings,
-        measurer,
-      );
-      const merged: string[][] = [];
-      for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-        merged.push(left[i] ?? [""]);
-        merged.push(right[i] ?? [""]);
-      }
-      return merged;
-    }
-
-    if (settings.parallelMode === "flow" || settings.parallelMode === "bands") {
-      // Independent pagination: each language keeps its own paragraphs, then
-      // the two are placed on one sheet (JPS / CUV–NIV columns, or a
-      // horizontal split when columns would be too narrow).
-      const region = singleTextGeometry(settings).slots[0];
-      const flow = settings.parallelMode === "flow";
-      const box = flow
-        ? {
-            width: Math.max(1, Math.floor((region.width - PARALLEL_GAP) / 2)),
-            height: region.height,
-          }
-        : {
-            width: region.width,
-            height: Math.max(1, Math.floor((region.height - PARALLEL_GAP) / 2)),
-          };
-      const left = paginate(
-        paragraphBlocks(primaryPassage.paragraphs, settings),
-        settings,
-        measurer,
-        box,
-      );
-      const right = paginate(
-        paragraphBlocks(secondaryPassage.paragraphs, settings),
-        settings,
-        measurer,
-        box,
-      );
-      const combined: string[][] = [];
-      for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-        const first = left[i]?.[0] ?? "";
-        const second = right[i]?.[0] ?? "";
-        combined.push([
-          flow ? combineParallelColumns(first, second) : combineParallelBands(first, second),
-        ]);
-      }
-      return combined;
-    }
-
-    const rows = alignPassages(primaryPassage.paragraphs, secondaryPassage.paragraphs);
-    return paginate(parallelBlocks(rows, settings), settings, measurer);
-  }, [measureReady, primaryPassage, secondaryPassage, settings, parallel, facing]);
+    return paginatePassages(primaryPassage, secondaryPassage, settings, measurer);
+  }, [measureReady, primaryPassage, secondaryPassage, settings]);
 
   /* ── zoom ────────────────────────────────────────────────────────────── */
 
@@ -318,16 +273,19 @@ export default function JournalApp() {
     st: number;
     moved: boolean;
   } | null>(null);
-  const [zoom, setZoom] = useState<ZoomId>("fit");
+  const [zoomFit, setZoomFit] = useState(true);
+  const [customScale, setCustomScale] = useState(1);
   const [scale, setScale] = useState(0.62);
 
   const sheet = pageDimensions(settings);
 
   useEffect(() => {
-    if (zoom !== "fit") {
-      setScale(Number(zoom));
-      return;
-    }
+    if (zoomFit) return;
+    setScale(customScale);
+  }, [zoomFit, customScale]);
+
+  useEffect(() => {
+    if (!zoomFit) return;
     const stage = stageRef.current;
     const desk = deskRef.current;
     if (!stage) return;
@@ -338,7 +296,9 @@ export default function JournalApp() {
       frame = requestAnimationFrame(() => {
         const canvas = stage.querySelector(".preview-canvas");
         const paddingInline = readPreviewPaddingInline(canvas, stage.clientWidth);
-        setScale(fitPreviewScale(stage.clientWidth, sheet.width, paddingInline));
+        const fitScale = fitPreviewScale(stage.clientWidth, sheet.width, paddingInline);
+        setScale(fitScale);
+        setCustomScale(fitScale);
       });
     };
 
@@ -350,7 +310,7 @@ export default function JournalApp() {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [zoom, sheet.width, railCollapsed]);
+  }, [zoomFit, sheet.width, railCollapsed]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -361,14 +321,11 @@ export default function JournalApp() {
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
       const now = Date.now();
-      if (now - lastStep < 120) return;
+      if (now - lastStep < 50) return;
       lastStep = now;
       const direction = event.deltaY > 0 ? -1 : 1;
-      setZoom((current) => {
-        const index = ZOOM_IDS.indexOf(current);
-        const next = Math.min(ZOOM_IDS.length - 1, Math.max(0, index + direction));
-        return ZOOM_IDS[next] ?? current;
-      });
+      setZoomFit(false);
+      setCustomScale((current) => clampZoom(current + direction * ZOOM_WHEEL_STEP));
     };
 
     stage.addEventListener("wheel", onWheel, { passive: false });
@@ -441,50 +398,54 @@ export default function JournalApp() {
 
   const handleRailViewChange = useCallback(
     (view: RailView) => {
-      const params = new URLSearchParams(searchParams.toString());
       if (view === "files") {
         if (!user) {
-          params.delete("files");
+          setFilesOpen(false);
+          syncJournalUrl({ files: false });
         } else {
-          params.set("files", "1");
+          setFilesOpen(true);
           setRailCollapsed(false);
+          syncJournalUrl({ files: true });
         }
       } else {
-        params.delete("files");
+        setFilesOpen(false);
         setDesignFocusToken((token) => token + 1);
         setOpenSections((prev) => ({ ...prev, designs: true }));
         setRailCollapsed(false);
+        syncJournalUrl({ files: false });
       }
-      const query = params.toString();
-      router.push(query ? `/?${query}` : "/");
     },
-    [router, searchParams, user],
+    [user],
   );
 
   useEffect(() => {
-    if (loading || user || !filesRequested) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("files");
-    const query = params.toString();
-    router.replace(query ? `/?${query}` : "/");
-  }, [loading, user, filesRequested, router, searchParams]);
+    if (loading || user || !filesOpen) return;
+    setFilesOpen(false);
+    syncJournalUrl({ files: false });
+  }, [loading, user, filesOpen]);
 
   const handleCloseAccount = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("account");
-    const query = params.toString();
-    router.push(query ? `/?${query}` : "/");
-  }, [router, searchParams]);
+    setAccountOpen(false);
+    syncJournalUrl({ account: false });
+  }, []);
+
+  const toggleAccount = useCallback(() => {
+    setAccountOpen((open) => {
+      const next = !open;
+      syncJournalUrl({ account: next });
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
-    if (filesOpen) setRailCollapsed(false);
-  }, [filesOpen]);
+    if (filesPanelOpen) setRailCollapsed(false);
+  }, [filesPanelOpen]);
 
   useEffect(() => {
     const mq = window.matchMedia(narrowUiQuery());
     const syncRail = () => {
       if (mq.matches) {
-        setRailCollapsed(startRailCollapsed(true, filesOpen));
+        setRailCollapsed(startRailCollapsed(true, filesPanelOpen));
         return;
       }
       try {
@@ -500,7 +461,7 @@ export default function JournalApp() {
     };
     mq.addEventListener("change", syncRail);
     return () => mq.removeEventListener("change", syncRail);
-  }, [filesOpen]);
+  }, [filesPanelOpen]);
 
   useEffect(() => {
     if (railCollapsed) return;
@@ -606,11 +567,11 @@ export default function JournalApp() {
     parallel && (settings.parallelMode === "flow" || settings.parallelMode === "bands")
       ? singleTextGeometry(settings)
       : undefined;
-  const pageCount = pages ? (blanks ? pages.length * 2 : pages.length) : 0;
+  const pageCount = printedPageCount(pages, settings, { facing });
   const chapterSpan = Number(reference.endChapter) - Number(reference.startChapter) + 1;
   const canPrint = Boolean(pages) && limitCheck.ok;
 
-  const pageCountLabel = `${pageCount} ${settings.pageSize} page${pageCount === 1 ? "" : "s"}`;
+  const pageCountLabel = formatPageCountLabel(pageCount, settings.pageSize);
 
   const summary = useMemo(() => {
     if (!bookName || !pages) return "";
@@ -624,6 +585,9 @@ export default function JournalApp() {
     (pages ? pageCountLabel : "");
 
   return (
+    <JournalUiProvider
+      value={{ accountOpen, toggleAccount, closeAccount: handleCloseAccount }}
+    >
     <div className="app">
       {/* @page can't read CSS variables, so the rule is generated per setting. */}
       <style>{`@page { size: ${cssPageSize(settings.pageSize)} ${settings.orientation}; margin: 0; }`}</style>
@@ -634,6 +598,7 @@ export default function JournalApp() {
       <Sidebar
         scripture={scripture}
         settings={settings}
+        reference={reference}
         summary={summary}
         copyright={notice}
         openSections={openSections}
@@ -641,10 +606,13 @@ export default function JournalApp() {
         limitCheck={limitCheck}
         user={user}
         railView={railView}
+        activeLibraryFile={activeLibraryFile}
         onRailViewChange={handleRailViewChange}
         onSettingsChange={handleSettingsChange}
         onToggleSection={handleToggleSection}
         onToggle={handleToggleRail}
+        onOpenFile={handleOpenFile}
+        onActiveLibraryFileChange={setActiveLibraryFile}
       />
 
       {!railCollapsed ? (
@@ -701,17 +669,12 @@ export default function JournalApp() {
               <AppNav />
             </Suspense>
             <div className="zoom-row">
-              <div className="zoom-select">
-                <span className="zoom-select-label">Zoom</span>
-                <Combobox
-                  label="Zoom"
-                  options={ZOOM_OPTIONS}
-                  value={zoom}
-                  onChange={(next) => setZoom(next as ZoomId)}
-                  searchable={false}
-                  className="combobox--compact"
-                />
-              </div>
+              <ZoomControl
+                fit={zoomFit}
+                scale={scale}
+                onFitChange={setZoomFit}
+                onScaleChange={setCustomScale}
+              />
 
               <button
                 type="button"
@@ -782,7 +745,8 @@ export default function JournalApp() {
         </div>
       </main>
 
-      {accountOpen ? <AccountSidecar onClose={handleCloseAccount} /> : null}
+      <AccountSidecar open={accountOpen} onClose={handleCloseAccount} />
     </div>
+    </JournalUiProvider>
   );
 }

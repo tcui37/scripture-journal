@@ -5,11 +5,16 @@ import {
   AccountError,
   authErrorField,
   authHref,
+  bookDisplayName,
+  builtinDefaultDesign,
   changePassword,
   createDesign,
+  defaultLibraryFileName,
   fetchMe,
   fileCreateBody,
+  formatPassageDisplay,
   formatPassageLabel,
+  journalFileState,
   friendlyAccountError,
   newestFirst,
   nextLabel,
@@ -17,8 +22,13 @@ import {
   sameDesign,
   signIn,
 } from "./account";
-import { DEFAULT_SETTINGS } from "./constants";
-import type { Design } from "./types";
+import {
+  BUILTIN_DEFAULT_DESIGN_ID,
+  DEFAULT_DESIGN_NAME,
+  DEFAULT_REFERENCE,
+  DEFAULT_SETTINGS,
+} from "./constants";
+import type { Design, JournalFile } from "./types";
 
 const originalFetch = globalThis.fetch;
 
@@ -51,6 +61,59 @@ describe("formatPassageLabel", () => {
   });
 });
 
+describe("formatPassageDisplay", () => {
+  const base = {
+    book_id: "JHN",
+    start_chapter: "3",
+    start_verse: "16",
+    end_chapter: "3",
+    end_verse: "16",
+  };
+
+  it("uses a readable book name", () => {
+    assert.equal(formatPassageDisplay(base), "John 3:16");
+  });
+
+  it("prefers a live translation book name when provided", () => {
+    assert.equal(formatPassageDisplay(base, "Gospel of John"), "Gospel of John 3:16");
+  });
+});
+
+describe("defaultLibraryFileName", () => {
+  it("appends notes to the readable passage", () => {
+    assert.equal(
+      defaultLibraryFileName({
+        book_id: "JHN",
+        start_chapter: "3",
+        start_verse: "16",
+        end_chapter: "3",
+        end_verse: "16",
+      }),
+      "John 3:16 notes",
+    );
+  });
+});
+
+describe("bookDisplayName", () => {
+  it("maps USFM ids to English short titles", () => {
+    assert.equal(bookDisplayName("JHN"), "John");
+    assert.equal(bookDisplayName("PSA"), "Psalms");
+  });
+
+  it("falls back to the id when unknown", () => {
+    assert.equal(bookDisplayName("XYZ"), "XYZ");
+  });
+});
+
+describe("builtinDefaultDesign", () => {
+  it("uses DEFAULT_SETTINGS and a stable built-in id", () => {
+    const preset = builtinDefaultDesign();
+    assert.equal(preset.id, BUILTIN_DEFAULT_DESIGN_ID);
+    assert.equal(preset.name, DEFAULT_DESIGN_NAME);
+    assert.equal(sameDesign(preset.settings, DEFAULT_SETTINGS), true);
+  });
+});
+
 describe("sameDesign", () => {
   it("treats matching settings as equal regardless of key order", () => {
     const flipped = Object.fromEntries(Object.entries(DEFAULT_SETTINGS).reverse()) as Design;
@@ -73,6 +136,36 @@ describe("newestFirst", () => {
       newestFirst(rows).map((row) => row.created_at),
       ["2026-03-01T00:00:00Z", "2026-02-01T00:00:00Z", "2026-01-01T00:00:00Z"],
     );
+  });
+});
+
+describe("journalFileState", () => {
+  const file: JournalFile = {
+    id: "1",
+    name: "John 3 notes",
+    book_id: "JHN",
+    start_chapter: "3",
+    start_verse: "16",
+    end_chapter: "3",
+    end_verse: "18",
+    design: { ...DEFAULT_SETTINGS, paper: "Warm grey" },
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("applies the saved passage and design but keeps live translations", () => {
+    const current = {
+      ...DEFAULT_REFERENCE,
+      bibleId: "esv",
+      compareId: "niv",
+    };
+    const next = journalFileState(file, current);
+    assert.equal(next.settings.paper, "Warm grey");
+    assert.equal(next.reference.bibleId, "esv");
+    assert.equal(next.reference.compareId, "niv");
+    assert.equal(next.reference.bookId, "JHN");
+    assert.equal(next.reference.startChapter, "3");
+    assert.equal(next.reference.endVerse, "18");
   });
 });
 

@@ -60,7 +60,7 @@ function SignupForm() {
             <div className="summary">Check your inbox, then return here to sign in.</div>
             <div className="auth-footer">
               <p>
-                <Link href={authHref("login", next)} className="action-button action-button-inline">
+                <Link href={authHref("login", next)} className="btn btn-primary btn-inline">
                   Back to sign in
                 </Link>
               </p>
@@ -114,7 +114,7 @@ function SignupForm() {
                   {error}
                 </div>
               ) : null}
-              <button type="submit" className="action-button" disabled={busy || apiStatus !== "ok"}>
+              <button type="submit" className="btn btn-primary btn-block" disabled={busy || apiStatus !== "ok"}>
                 {busy ? "Creating…" : "Create account"}
               </button>
             </form>

@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 import GuestPrompt from "@/components/GuestPrompt";
 import PanelSkeleton from "@/components/PanelSkeleton";
 import TrashButton from "@/components/TrashButton";
+import { useLibrary } from "@/components/LibraryProvider";
 import {
+  builtinDefaultDesign,
   createDesign,
   deleteDesign,
   friendlyAccountError,
-  listDesigns,
   newestFirst,
   sameDesign,
 } from "@/lib/account";
@@ -21,64 +22,83 @@ interface DesignsPanelProps {
   onSettingsChange: (patch: Partial<Settings>) => void;
 }
 
+const BUILTIN_DEFAULT = builtinDefaultDesign();
+
 export default function DesignsPanel({ user, settings, onSettingsChange }: DesignsPanelProps) {
+  const {
+    designs,
+    setDesigns,
+    designsLoading,
+    designsStatus,
+    designsFailed,
+  } = useLibrary();
   const [name, setName] = useState("");
-  const [designs, setDesigns] = useState<DesignRecord[]>([]);
   const [status, setStatus] = useState("");
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
-  const [listLoading, setListLoading] = useState(Boolean(user));
 
   useEffect(() => {
-    if (!user) {
-      setDesigns([]);
-      setListLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setListLoading(true);
-    listDesigns()
-      .then((rows) => {
-        if (!cancelled) {
-          setDesigns(newestFirst(rows));
-          setStatus("");
-          setFailed(false);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setFailed(true);
-          setStatus(friendlyAccountError(error, "designs"));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setListLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  if (!user) {
-    return (
-      <GuestPrompt
-        next="/"
-        message="A Design is layout, type, and text styles — not scripture or translation. Sign in to save, apply, and remove them."
-      />
-    );
-  }
-
-  if (listLoading) {
-    return <PanelSkeleton label="Loading designs…" />;
-  }
+    if (!designsStatus) return;
+    setStatus(designsStatus);
+    setFailed(designsFailed);
+  }, [designsStatus, designsFailed]);
 
   const notice = (text: string, error = false) => {
     setFailed(error);
     setStatus(text);
   };
+
+  const apply = (design: Design, label: string, alreadyOn: boolean) => {
+    if (
+      !alreadyOn &&
+      !window.confirm(
+        `Apply “${label}”? The current layout will change. Save it under Designs first if you want to keep it.`,
+      )
+    ) {
+      return;
+    }
+    onSettingsChange(design);
+    notice(alreadyOn ? "This design is already in use." : "Applied. The page preview uses this layout.");
+  };
+
+  const renderBuiltinRow = () => {
+    const applied = sameDesign(BUILTIN_DEFAULT.settings, settings);
+    return (
+      <li
+        key={BUILTIN_DEFAULT.id}
+        className={`record-row is-builtin${applied ? " is-on" : ""}`}
+      >
+        <button
+          type="button"
+          className="record-main"
+          onClick={() => apply(BUILTIN_DEFAULT.settings, BUILTIN_DEFAULT.name, applied)}
+          aria-pressed={applied}
+          title="Apply the journal default layout"
+        >
+          <span className="record-name">{BUILTIN_DEFAULT.name}</span>
+          {applied ? <span className="record-badge">In use</span> : null}
+        </button>
+      </li>
+    );
+  };
+
+  if (!user) {
+    return (
+      <div className="designs-panel" id="rail-designs">
+        <p className="panel-note">Layout, type, and text styles — not scripture or translation.</p>
+        <ul className="record-list">{renderBuiltinRow()}</ul>
+        <GuestPrompt
+          next="/"
+          message="Sign in to save your own layouts alongside the journal default."
+        />
+      </div>
+    );
+  }
+
+  if (designsLoading && !designs.length) {
+    return <PanelSkeleton label="Loading designs…" />;
+  }
 
   const handleSave = async () => {
     const trimmed = name.trim();
@@ -118,19 +138,6 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
     }
   };
 
-  const apply = (design: Design, name: string, alreadyOn: boolean) => {
-    if (
-      !alreadyOn &&
-      !window.confirm(
-        `Apply “${name}”? The current layout will change. Save it under Designs first if you want to keep it.`,
-      )
-    ) {
-      return;
-    }
-    onSettingsChange(design);
-    notice(alreadyOn ? "This design is already in use." : "Applied. The page preview uses this layout.");
-  };
-
   return (
     <div className="designs-panel" id="rail-designs">
       <p className="panel-note">Layout, type, and text styles — not scripture or translation.</p>
@@ -152,7 +159,7 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
         </label>
         <button
           type="button"
-          className="action-button action-button-inline"
+          className="btn btn-primary btn-inline"
           onClick={() => void handleSave()}
           disabled={busy}
         >
@@ -160,37 +167,39 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
         </button>
       </div>
 
-      {designs.length ? (
-        <ul className="record-list">
-          {designs.map((row) => {
-            const applied = sameDesign(row.settings, settings);
-            return (
-              <li key={row.id} className={`record-row${applied ? " is-on" : ""}`}>
-                <button
-                  type="button"
-                  className="record-main"
-                  onClick={() => apply(row.settings, row.name, applied)}
-                  aria-pressed={applied}
-                  title="Apply this design"
-                >
-                  <span className="record-name">{row.name}</span>
-                  {applied ? <span className="record-badge">In use</span> : null}
-                </button>
-                <TrashButton
-                  confirming={pendingRemove === row.id}
-                  onClick={() => void handleRemove(row.id)}
-                  disabled={busy}
-                  label="Remove"
-                />
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
+      <ul className="record-list">
+        {renderBuiltinRow()}
+        {designs.map((row) => {
+          const applied = sameDesign(row.settings, settings);
+          return (
+            <li key={row.id} className={`record-row${applied ? " is-on" : ""}`}>
+              <button
+                type="button"
+                className="record-main"
+                onClick={() => apply(row.settings, row.name, applied)}
+                aria-pressed={applied}
+                title="Apply this design"
+              >
+                <span className="record-name">{row.name}</span>
+                {applied ? <span className="record-badge">In use</span> : null}
+              </button>
+              <TrashButton
+                confirming={pendingRemove === row.id}
+                onClick={() => void handleRemove(row.id)}
+                disabled={busy}
+                label="Remove"
+              />
+            </li>
+          );
+        })}
+      </ul>
+
+      {designs.length === 0 ? (
         <p className="panel-note">
-          No designs yet. Set the page how you like it, name it, and Save — it will show up here.
+          No saved designs yet. Set the page how you like it, name it, and Save — it will show up
+          above.
         </p>
-      )}
+      ) : null}
 
       {status ? (
         <div className={failed ? "warning" : "summary"} role={failed ? "alert" : "status"}>

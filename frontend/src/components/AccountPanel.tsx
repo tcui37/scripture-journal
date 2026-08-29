@@ -65,7 +65,7 @@ export default function AccountPanel() {
             <span className="control-label">Signed in as</span>
             <div className="identity-chip">{user.email}</div>
           </div>
-          <button type="button" className="link-button" onClick={() => void handleSignOut()}>
+          <button type="button" className="btn btn-secondary" onClick={() => void handleSignOut()}>
             Sign out
           </button>
         </div>
@@ -108,7 +108,7 @@ export default function AccountPanel() {
                 {passwordStatus}
               </div>
             ) : null}
-            <button type="submit" className="action-button" disabled={passwordBusy}>
+            <button type="submit" className="btn btn-primary btn-block" disabled={passwordBusy}>
               {passwordBusy ? "Updating…" : "Update password"}
             </button>
           </form>

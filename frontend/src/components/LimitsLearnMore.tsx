@@ -107,7 +107,7 @@ export default function LimitsLearnMore({ bibles, book, reference }: LimitsLearn
                 </div>
                 <button
                   type="button"
-                  className="rail-toggle"
+                  className="icon-btn dialog-close"
                   aria-label="Close licence details"
                   onClick={() => setOpen(false)}
                 >

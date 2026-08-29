@@ -1,5 +1,9 @@
 import type { PageSize, ParallelMode, Settings } from "./types";
 
+/** Short app description for meta tags and UI taglines. */
+export const APP_TAGLINE =
+  "Design printable scripture journal pages — for export and print";
+
 /** Sheet sizes in CSS pixels at 96dpi, portrait. */
 export const PAGE_SIZES: Record<PageSize, { width: number; height: number }> = {
   A3: { width: 1123, height: 1587 }, // 297 × 420 mm
@@ -63,6 +67,12 @@ export const PAPER_COLORS: Record<string, string> = {
 
 /** Bumped when the stored shape changes, so old entries are ignored. */
 export const STORAGE_KEY = "scripture-journal-v3";
+
+/** Built-in Designs preset for every user; not stored in the database. */
+export const DEFAULT_DESIGN_NAME = "Journal default";
+
+/** Sentinel id for the built-in preset (never sent to the API). */
+export const BUILTIN_DEFAULT_DESIGN_ID = "__builtin-default__";
 
 export const DEFAULT_SETTINGS: Settings = {
   pageSize: "A4",
@@ -225,11 +235,29 @@ export const PAPER_OPTIONS = [
   { id: "Warm grey", label: "Warm grey" },
 ] as const;
 
-export const ZOOM_OPTIONS = [
-  { id: "fit", label: "Fit" },
-  { id: "0.75", label: "75%" },
-  { id: "1", label: "100%" },
-] as const;
+/** Preview zoom bounds — floor matches fitPreviewScale minimum. */
+export const ZOOM_MIN = 0.2;
+export const ZOOM_MAX = 2;
+export const ZOOM_SLIDER_STEP = 0.01;
+export const ZOOM_WHEEL_STEP = 0.05;
+/** Percentages the slider gently snaps to when within this many scale units. */
+export const ZOOM_SNAP_POINTS = [0.25, 0.5, 0.75, 1] as const;
+export const ZOOM_SNAP_THRESHOLD = 0.02;
+
+export function clampZoom(scale: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+}
+
+export function snapZoom(scale: number): number {
+  for (const point of ZOOM_SNAP_POINTS) {
+    if (Math.abs(scale - point) <= ZOOM_SNAP_THRESHOLD) return point;
+  }
+  return scale;
+}
+
+export function formatZoomPercent(scale: number): string {
+  return String(Math.round(scale * 100));
+}
 
 /** Checkbox-style settings, rendered as one labelled list. */
 export const TEXT_TOGGLES = [

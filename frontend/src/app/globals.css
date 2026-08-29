@@ -69,6 +69,12 @@ button {
   font-family: inherit;
 }
 
+button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -175,9 +181,14 @@ button {
   background: transparent;
   color: var(--color-neutral-600);
   cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
-.rail-toggle:hover {
+.rail-toggle:hover:not(:disabled) {
   border-color: var(--color-accent);
   color: var(--color-accent-700);
 }
@@ -220,15 +231,20 @@ button {
   padding: var(--space-2) var(--space-6) var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: 0;
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
 }
 
+.rail-body > :not(.rail-footer) {
+  margin-bottom: var(--space-6);
+}
+
 .rail-footer {
   flex: none;
+  margin-top: auto;
   padding: var(--space-4) 0 0;
   border-top: 1px solid var(--color-divider);
   display: flex;
@@ -253,18 +269,20 @@ button {
 
 .section {
   border-bottom: 1px solid var(--color-divider);
+  padding-block: var(--space-2);
+  /* Flex item in .rail-body — default min-width:auto lets Designs content widen the rail. */
+  min-width: 0;
+  width: 100%;
+}
+
+.section.is-open {
   padding-bottom: var(--space-3);
 }
 
 /* Last section in the accordion — not :last-of-type because .rail-footer is also a div sibling. */
 .rail-body > .section:not(:has(~ .section)) {
   border-bottom: none;
-}
-
-/* Pull the footer divider up against the last section's padding; rail-body gap
-   otherwise lands between the title row and the footer border instead of after it. */
-.rail-body > .section:not(:has(~ .section)) + .rail-footer {
-  margin-top: calc(-1 * var(--space-6));
+  margin-bottom: 0;
 }
 
 .section-title {
@@ -272,15 +290,18 @@ button {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: 4px 2px;
+  min-height: 28px;
+  padding: 0 2px;
   border: 0;
   background: transparent;
   cursor: pointer;
-  font: inherit;
-  font-size: 11px;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: var(--font-size-caption);
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--color-fg-muted);
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
   text-align: left;
   user-select: none;
 }
@@ -298,15 +319,21 @@ button {
 .section-name {
   flex: 1;
   margin: 0;
-  font: inherit;
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
   letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  /* Uppercase captions sit optically high — nudge down slightly in the row. */
+  transform: translateY(0.5px);
 }
 
 .chevron {
   flex: none;
+  display: block;
+  flex-shrink: 0;
+  margin-top: 1px;
   color: var(--color-neutral-400);
   transition: transform 0.26s ease;
 }
@@ -334,10 +361,11 @@ button {
   width: 100%;
 }
 
-/* Keep overflow hidden while collapsed; show full controls when open. */
+/* :focus-visible uses 2px outline + 2px offset — pad so rings aren't clipped.
+   Keep overflow hidden + min-height 0 so the grid row can animate both ways. */
 .section.is-open > .section-panel > .section-panel-inner {
-  overflow: visible;
-  min-height: auto;
+  padding-block: 4px;
+  margin-block: -4px;
 }
 
 .section-body {
@@ -346,6 +374,8 @@ button {
   gap: var(--space-3);
   min-width: 0;
   width: 100%;
+  padding-top: 0;
+  transition: padding-top 0.30s ease;
 }
 
 .section.is-open .section-body {
@@ -357,7 +387,13 @@ button {
     transition: none;
   }
 
-  .section .chevron {
+  .section .chevron,
+  .section-body {
+    transition: none;
+  }
+
+  .sidecar,
+  .sidecar-backdrop {
     transition: none;
   }
 }
@@ -367,13 +403,17 @@ button {
 }
 
 .advanced > summary {
+  display: flex;
+  align-items: center;
   cursor: pointer;
   font-size: var(--font-size-caption);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--color-fg-muted);
   list-style: none;
-  padding: 4px 0;
+  min-height: 32px;
+  padding: 0;
+  text-align: left;
 }
 
 .advanced > summary::-webkit-details-marker {
@@ -685,6 +725,8 @@ button {
   border: 0;
   background: color-mix(in srgb, var(--color-neutral-900) 36%, transparent);
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .limits-dialog {
@@ -843,107 +885,146 @@ button {
   font-weight: 400;
 }
 
-.link-button {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 14px;
-  background: transparent;
-  border: 1px solid var(--color-neutral-300);
-  color: var(--color-neutral-700);
-  border-radius: 999px;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-}
+/* ── buttons (text + icon) ───────────────────────────────────────────── */
 
-.link-button:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent-700);
-}
-
-.link-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
+.btn,
+.link-button,
 .action-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 10px 16px;
-  border: none;
+  padding: 9px 18px;
+  margin: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-neutral-100);
+  background: transparent;
+  color: var(--color-neutral-700);
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   text-decoration: none;
-}
-
-.action-button-inline {
-  width: auto;
-  flex: none;
-  align-self: flex-end;
-  padding: 10px 18px;
-  white-space: nowrap;
-}
-
-.action-button:hover:not(:disabled) {
-  background: var(--color-accent-600);
-}
-
-.action-button:active:not(:disabled) {
-  background: var(--color-accent-700);
-}
-
-.action-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.icon-button {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid var(--color-neutral-300);
-  color: var(--color-neutral-700);
-  border-radius: 999px;
-  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
   transition:
     background 0.15s,
     border-color 0.15s,
     color 0.15s;
 }
 
+.btn:disabled,
+.link-button:disabled,
+.action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary,
+.action-button {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.btn-primary:hover:not(:disabled),
+.action-button:hover:not(:disabled) {
+  background: var(--color-accent-600);
+  border-color: var(--color-accent-600);
+}
+
+.btn-primary:active:not(:disabled),
+.action-button:active:not(:disabled) {
+  background: var(--color-accent-700);
+  border-color: var(--color-accent-700);
+}
+
+.btn-secondary,
+.link-button {
+  border-color: var(--color-neutral-300);
+  background: transparent;
+  color: var(--color-neutral-700);
+}
+
+.btn-secondary:hover:not(:disabled),
+.link-button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.btn-block,
+.action-button {
+  width: 100%;
+}
+
+.btn-inline,
+.action-button-inline {
+  width: auto;
+  flex: none;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.link-button {
+  align-self: flex-start;
+}
+
+.icon-btn,
+.icon-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 999px;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.icon-btn:hover:not(:disabled):not(.is-danger),
 .icon-button:hover:not(:disabled):not(.is-danger) {
   border-color: var(--color-accent);
   color: var(--color-accent-700);
 }
 
+.icon-btn:disabled,
 .icon-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
+.icon-btn.is-danger,
 .icon-button.is-danger {
   border-color: color-mix(in srgb, var(--color-fg-critical) 45%, var(--color-neutral-300));
   color: var(--color-fg-critical);
 }
 
+.icon-btn.is-danger:hover:not(:disabled),
 .icon-button.is-danger:hover:not(:disabled) {
   border-color: var(--color-fg-critical);
   color: var(--color-fg-critical);
 }
 
+.icon-btn.is-label,
 .icon-button.is-label {
   width: auto;
   height: auto;
@@ -951,6 +1032,11 @@ button {
   gap: var(--space-2);
   font-size: 12px;
   font-weight: 600;
+}
+
+.dialog-close {
+  flex: none;
+  margin-top: 2px;
 }
 
 .control input[type="text"],
@@ -985,6 +1071,55 @@ button {
 .panel-note strong {
   color: var(--color-neutral-800);
   font-weight: 600;
+}
+
+.passage-chip {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-100);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-neutral-800);
+}
+
+.control-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--color-neutral-600);
+}
+
+.files-panel .record-main {
+  flex: 1;
+}
+
+.library-block-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.library-block-title-row .library-block-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-block-title-row .btn-sm {
+  flex: none;
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .panel-skeleton {
@@ -1031,20 +1166,31 @@ button {
 
 .designs-panel .record-list {
   gap: var(--space-2);
+  min-width: 0;
+  width: 100%;
 }
 
 .designs-panel .record-row {
   padding: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.designs-panel .record-row.is-builtin .record-main {
+  flex: 1;
 }
 
 /* Full-width rail on mobile still fits name + save on one row. */
 @media screen and (max-width: 768px) {
-  .designs-panel .save-row {
+  .designs-panel .save-row,
+  .library-block .save-row {
     flex-direction: row;
     align-items: flex-end;
   }
 
-  .designs-panel .action-button-inline {
+  .designs-panel .btn-inline,
+  .designs-panel .action-button-inline,
+  .library-block .btn-inline,
+  .library-block .action-button-inline {
     width: auto;
     align-self: auto;
   }
@@ -1054,6 +1200,8 @@ button {
   display: flex;
   align-items: flex-end;
   gap: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .save-row-field {
@@ -1336,21 +1484,108 @@ button {
   gap: 8px;
 }
 
-.zoom-select {
+.zoom-control {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.zoom-select-label {
+.zoom-control-label {
   font-size: var(--font-size-caption);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--color-fg-muted);
 }
 
-.zoom-select .combobox {
-  min-width: 5.5rem;
+.zoom-fit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 34px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-700);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.zoom-fit-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.zoom-fit-button.is-on {
+  border-color: var(--color-neutral-800);
+  color: var(--color-neutral-800);
+}
+
+.zoom-percent {
+  position: relative;
+}
+
+.zoom-slider-popup {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px;
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.zoom-slider-popup.is-open {
+  display: flex;
+}
+
+.zoom-slider {
+  width: 28px;
+  height: 108px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.zoom-percent-input {
+  cursor: pointer;
+}
+
+.zoom-control.is-slider-open .zoom-percent-input {
+  cursor: text;
+}
+
+.zoom-percent-input {
+  box-sizing: border-box;
+  width: 3.75rem;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 999px;
+  background: var(--color-neutral-100);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  color: var(--color-neutral-800);
+}
+
+.zoom-percent-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 .download-button {
@@ -1596,7 +1831,7 @@ button.api-warmup:hover,
   color: var(--color-neutral-100);
 }
 
-/* Right-side account panel — mirrors the settings rail. */
+/* Right-side account panel — mirrors the settings rail width transition. */
 .sidecar-backdrop {
   position: absolute;
   inset: 0;
@@ -1606,20 +1841,42 @@ button.api-warmup:hover,
   border: 0;
   background: color-mix(in srgb, var(--color-neutral-900) 28%, transparent);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.30s ease;
+}
+
+.sidecar-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sidecar {
   position: relative;
   z-index: 6;
-  width: 352px;
+  width: 0;
+  min-width: 0;
   flex: none;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--color-neutral-100);
   border-left: 1px solid var(--color-divider);
+  border-left-width: 0;
   display: flex;
   flex-direction: column;
+  transition: width 0.30s ease;
+}
+
+.sidecar.is-open {
+  width: 352px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-left-width: 1px;
+}
+
+.sidecar:not(.is-open) .sidecar-header,
+.sidecar:not(.is-open) .sidecar-body {
+  min-width: 0;
 }
 
 .sidecar-header,
@@ -1735,6 +1992,7 @@ button.api-warmup:hover,
   color: var(--color-accent-700);
 }
 
+.auth-footer .btn-inline,
 .auth-footer .action-button-inline {
   display: inline-flex;
   width: auto;
@@ -1810,10 +2068,13 @@ button.api-warmup:hover,
     right: 0;
     top: 0;
     bottom: 0;
-    width: 100%;
     max-width: 100%;
     border-left: none;
     box-shadow: var(--shadow-lg);
+  }
+
+  .sidecar.is-open {
+    width: 100%;
   }
 
   .sidecar-header,
@@ -1886,6 +2147,7 @@ button.api-warmup:hover,
 
   .app-nav-tab,
   .rail-toggle,
+  .icon-btn,
   .account-icon,
   .download-button,
   .icon-button {
@@ -1894,8 +2156,10 @@ button.api-warmup:hover,
   }
 
   .rail-toggle.is-label,
+  .icon-btn.is-label,
   .account-icon.is-label,
-  .download-button.is-label {
+  .download-button.is-label,
+  .icon-button.is-label {
     width: auto;
     height: 44px;
     padding: 0 14px 0 12px;
@@ -1932,12 +2196,26 @@ button.api-warmup:hover,
     padding-bottom: 8px;
   }
 
+  .zoom-fit-button,
+  .zoom-percent-input {
+    min-height: 44px;
+  }
+
+  .zoom-percent-input {
+    font-size: 16px;
+  }
+
+  .zoom-slider {
+    height: 120px;
+  }
+
   .opt {
     min-height: 44px;
   }
 
   .section-title,
   .toggle,
+  .btn,
   .link-button,
   .action-button,
   .swap-button {
@@ -2026,6 +2304,7 @@ button.api-warmup:hover,
     align-items: stretch;
   }
 
+  .btn-inline,
   .action-button-inline {
     width: 100%;
     align-self: stretch;
@@ -2044,7 +2323,9 @@ button.api-warmup:hover,
     width: 100%;
   }
 
+  .guest-prompt .btn-inline,
   .guest-prompt .action-button-inline,
+  .guest-prompt .btn-secondary,
   .guest-prompt .link-button {
     flex: 1;
     justify-content: center;
@@ -2069,6 +2350,7 @@ button.api-warmup:hover,
 
   .app-nav-tab,
   .rail-toggle,
+  .icon-btn,
   .account-icon,
   .download-button,
   .icon-button {
@@ -2077,6 +2359,7 @@ button.api-warmup:hover,
   }
 
   .rail-toggle.is-label,
+  .icon-btn.is-label,
   .account-icon.is-label,
   .download-button.is-label,
   .icon-button.is-label {
