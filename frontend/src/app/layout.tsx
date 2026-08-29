@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Caprasimo, Figtree, Source_Serif_4 } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 
 import AuthProvider from "@/components/AuthProvider";
 import { APP_TAGLINE } from "@/lib/constants";
@@ -47,6 +48,7 @@ export default function RootLayout({
     <html lang="en" className={`${heading.variable} ${body.variable} ${serif.variable}`}>
       <body>
         <AuthProvider>{children}</AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
