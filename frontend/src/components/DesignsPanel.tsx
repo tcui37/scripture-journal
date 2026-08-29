@@ -20,23 +20,34 @@ interface DesignsPanelProps {
   user: AuthUser | null;
   settings: Settings;
   onSettingsChange: (patch: Partial<Settings>) => void;
+  active?: boolean;
 }
 
 const BUILTIN_DEFAULT = builtinDefaultDesign();
 
-export default function DesignsPanel({ user, settings, onSettingsChange }: DesignsPanelProps) {
+export default function DesignsPanel({
+  user,
+  settings,
+  onSettingsChange,
+  active = false,
+}: DesignsPanelProps) {
   const {
     designs,
     setDesigns,
     designsLoading,
     designsStatus,
     designsFailed,
+    ensureDesignsLoaded,
   } = useLibrary();
   const [name, setName] = useState("");
   const [status, setStatus] = useState("");
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (active) ensureDesignsLoaded();
+  }, [active, ensureDesignsLoaded]);
 
   useEffect(() => {
     if (!designsStatus) return;

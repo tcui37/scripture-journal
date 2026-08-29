@@ -157,6 +157,35 @@ but sign-in, saved files, and saved page layouts need the backend on `:8000`.
 Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `backend/.env` for account
 storage (see Environment variables).
 
+## Local development performance
+
+Run **both** servers during development:
+
+| Process | Command | URL |
+| --- | --- | --- |
+| Backend (FastAPI) | `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` | http://127.0.0.1:8000 |
+| Frontend (Next.js) | `npm run dev` | http://localhost:3000 |
+
+The frontend proxies `/api/*` to the backend, so the browser only talks to
+`:3000`. Production builds are faster and more stable than `next dev` — Turbopack
+and hot reload add overhead locally.
+
+**`.next` cache corruption.** If the dev server hangs, shows stale UI, or fails
+with cryptic webpack errors, clear the Next cache and restart:
+
+```bash
+cd frontend
+npm run dev:clean
+```
+
+Or manually: `rm -rf frontend/.next && npm run dev`.
+
+**Lazy library loading.** Saved files and saved page layouts are not fetched on
+sign-in. The Files panel loads your library when you open the Files tab; the
+Designs section loads saved layouts when you expand Designs in the sidebar.
+Passage text is cached in memory so preview, file open, and page-count
+calculation share one fetch per range.
+
 ## Environment variables
 
 Names only — never commit values. Local: `backend/.env`, `frontend/.env.local`

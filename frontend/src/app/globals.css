@@ -35,9 +35,12 @@
   --color-fg-critical: #a3341f;
   --color-border-critical: var(--color-fg-critical);
 
-  --font-size-caption: 11px;
-  --font-size-body-small: 13px;
-  --font-size-body: 15px;
+  /* UI chrome only — `.jpage` text uses absolute pt sizes from render.ts */
+  --ui-font-scale: 1.08;
+
+  --font-size-caption: calc(11px * var(--ui-font-scale));
+  --font-size-body-small: calc(13px * var(--ui-font-scale));
+  --font-size-body: calc(15px * var(--ui-font-scale));
 }
 
 *,
@@ -59,7 +62,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body), system-ui, sans-serif;
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 1.55;
 }
 
@@ -101,7 +104,7 @@ button {
   background: var(--color-neutral-900);
   color: var(--color-neutral-100);
   border-radius: 999px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   font-weight: 600;
   text-decoration: none;
   transform: translateY(-200%);
@@ -199,7 +202,7 @@ button {
   margin-top: 0;
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
   gap: var(--space-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
   color: var(--color-fg-muted);
 }
@@ -207,7 +210,7 @@ button {
 .rail-title {
   font-family: var(--font-heading), system-ui, sans-serif;
   font-weight: 400;
-  font-size: 32px;
+  font-size: calc(32px * var(--ui-font-scale));
   line-height: 1.02;
   letter-spacing: -0.015em;
   margin: 0;
@@ -216,7 +219,7 @@ button {
 
 .rail-tagline {
   margin-top: var(--space-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   color: var(--color-neutral-600);
 }
 
@@ -253,7 +256,7 @@ button {
 }
 
 .copyright {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   line-height: 1.5;
   color: var(--color-fg-muted);
   overflow-wrap: anywhere;
@@ -482,7 +485,7 @@ button {
   background: var(--color-neutral-100);
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
   line-height: 1;
   color: var(--color-text);
 }
@@ -501,7 +504,7 @@ button {
   border: 0;
   background: transparent;
   color: var(--color-neutral-600);
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-font-scale));
   line-height: 1;
   cursor: pointer;
   border-radius: 999px;
@@ -529,7 +532,7 @@ button {
   color: var(--color-text);
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
   text-overflow: ellipsis;
 }
 
@@ -574,7 +577,7 @@ button {
 .combobox-option {
   padding: 7px 10px;
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   line-height: 1.35;
   color: var(--color-neutral-800);
   cursor: pointer;
@@ -593,13 +596,13 @@ button {
 
 .combobox-empty {
   padding: 8px 10px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   color: var(--color-fg-muted);
 }
 
 .combobox--compact .combobox-input {
   padding: 6px 28px 6px 14px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
 }
 
@@ -620,7 +623,7 @@ button {
   align-items: center;
   gap: 9px;
   padding: 6px 4px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   color: var(--color-neutral-800);
   cursor: pointer;
   border-radius: var(--radius-md);
@@ -683,7 +686,7 @@ button {
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-fg-critical) 12%, transparent);
   color: var(--color-fg-critical);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   line-height: 1.5;
   font-weight: 600;
 }
@@ -750,7 +753,7 @@ button {
 
 .limits-dialog-eyebrow {
   margin: 0 0 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-fg-muted);
@@ -759,7 +762,7 @@ button {
 .limits-dialog-title {
   font-family: var(--font-heading), system-ui, sans-serif;
   font-weight: 400;
-  font-size: 26px;
+  font-size: calc(26px * var(--ui-font-scale));
   line-height: 1.08;
   letter-spacing: -0.015em;
   margin: 0;
@@ -775,7 +778,7 @@ button {
 
 .limits-dialog-block p {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
   line-height: 1.5;
   font-weight: 400;
   color: var(--color-neutral-700);
@@ -783,7 +786,7 @@ button {
 
 .limits-dialog-version {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-neutral-900);
@@ -791,7 +794,7 @@ button {
 
 .limits-dialog-source {
   margin-top: var(--space-2) !important;
-  font-size: 12px !important;
+  font-size: calc(12px * var(--ui-font-scale)) !important;
 }
 
 .limits-dialog-source a {
@@ -806,7 +809,7 @@ button {
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
   color: var(--color-accent-700);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   line-height: 1.45;
   font-weight: 600;
 }
@@ -841,7 +844,7 @@ button {
     background 0.15s,
     border-color 0.15s;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   font-weight: 500;
   letter-spacing: 0.01em;
   background: transparent;
@@ -880,7 +883,7 @@ button {
 .opt-hint {
   display: block;
   margin-top: 3px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   opacity: 0.72;
   font-weight: 400;
 }
@@ -900,7 +903,7 @@ button {
   background: transparent;
   color: var(--color-neutral-700);
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -968,7 +971,7 @@ button {
 
 .btn-sm {
   padding: 5px 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   letter-spacing: 0.03em;
 }
 
@@ -1030,7 +1033,7 @@ button {
   height: auto;
   padding: var(--space-2) var(--space-3);
   gap: var(--space-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
 }
 
@@ -1048,7 +1051,7 @@ button {
   color: var(--color-text);
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
 }
 
 .control input[type="text"]::placeholder,
@@ -1063,7 +1066,7 @@ button {
 
 .panel-note {
   margin: 0;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   line-height: 1.45;
   color: var(--color-neutral-600);
 }
@@ -1079,7 +1082,7 @@ button {
   border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md);
   background: var(--color-neutral-100);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   font-weight: 600;
   line-height: 1.35;
   color: var(--color-neutral-800);
@@ -1088,7 +1091,7 @@ button {
 .control-hint {
   display: block;
   margin-top: 6px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   line-height: 1.35;
   color: var(--color-neutral-600);
 }
@@ -1228,7 +1231,7 @@ button {
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-fg-muted);
@@ -1245,7 +1248,7 @@ button {
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
   background: var(--color-neutral-100);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
   font-weight: 600;
   color: var(--color-neutral-800);
   overflow-wrap: anywhere;
@@ -1305,7 +1308,7 @@ button {
 }
 
 .record-name {
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   font-weight: 600;
   color: inherit;
   overflow: hidden;
@@ -1319,7 +1322,7 @@ button {
   border-radius: 999px;
   background: var(--color-neutral-800);
   color: var(--color-neutral-100);
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1327,7 +1330,7 @@ button {
 
 .record-meta {
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   color: var(--color-neutral-600);
 }
 
@@ -1348,7 +1351,7 @@ button {
   border: 1px solid var(--color-neutral-300);
   color: var(--color-neutral-700);
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1402,7 +1405,7 @@ button {
 .topbar-reference {
   font-family: var(--font-heading), system-ui, sans-serif;
   font-weight: 400;
-  font-size: 19px;
+  font-size: calc(19px * var(--ui-font-scale));
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -1438,7 +1441,7 @@ button {
 }
 
 .topbar-status {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   color: var(--color-neutral-600);
   white-space: nowrap;
 }
@@ -1461,7 +1464,7 @@ button {
   }
 
   .topbar-reference {
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
     max-width: 100%;
   }
 
@@ -1508,7 +1511,7 @@ button {
   border: 1px solid var(--color-neutral-300);
   color: var(--color-neutral-700);
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1576,7 +1579,7 @@ button {
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
   background: var(--color-neutral-100);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
   line-height: 1;
   text-align: center;
@@ -1610,7 +1613,7 @@ button {
   height: auto;
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-3);
   gap: var(--space-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
 }
 
@@ -1714,7 +1717,7 @@ button {
 .app-nav-tab {
   padding: 6px 14px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
   text-decoration: none;
   background: transparent;
@@ -1756,7 +1759,7 @@ button {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
   color: var(--color-fg-muted);
   line-height: 1.3;
@@ -1816,7 +1819,7 @@ button.api-warmup:hover,
   height: auto;
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-3);
   gap: var(--space-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
 }
 
@@ -1898,7 +1901,7 @@ button.api-warmup:hover,
 .sidecar-title {
   font-family: var(--font-heading), system-ui, sans-serif;
   font-weight: 400;
-  font-size: 32px;
+  font-size: calc(32px * var(--ui-font-scale));
   line-height: 1.02;
   letter-spacing: -0.015em;
   margin: 0;
@@ -1907,7 +1910,7 @@ button.api-warmup:hover,
 
 .sidecar-tagline {
   margin-top: var(--space-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   color: var(--color-neutral-600);
 }
 
@@ -1939,7 +1942,7 @@ button.api-warmup:hover,
 
 .auth-eyebrow {
   margin: 0 0 var(--space-2);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-fg-muted);
@@ -1948,7 +1951,7 @@ button.api-warmup:hover,
 .auth-heading {
   font-family: var(--font-heading), system-ui, sans-serif;
   font-weight: 400;
-  font-size: 36px;
+  font-size: calc(36px * var(--ui-font-scale));
   line-height: 1.02;
   letter-spacing: -0.015em;
   margin: 0;
@@ -1957,7 +1960,7 @@ button.api-warmup:hover,
 
 .auth-lead {
   margin: var(--space-3) 0 var(--space-6);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
   line-height: 1.5;
   color: var(--color-neutral-600);
 }
@@ -1980,7 +1983,7 @@ button.api-warmup:hover,
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   color: var(--color-fg-muted);
 }
 
@@ -2055,7 +2058,7 @@ button.api-warmup:hover,
   }
 
   .rail-title {
-    font-size: 28px;
+    font-size: calc(28px * var(--ui-font-scale));
   }
 
   .sidecar-backdrop {
@@ -2099,7 +2102,7 @@ button.api-warmup:hover,
   }
 
   .sidecar-title {
-    font-size: 28px;
+    font-size: calc(28px * var(--ui-font-scale));
   }
 
   .topbar {
@@ -2120,7 +2123,7 @@ button.api-warmup:hover,
   }
 
   .topbar-reference {
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
     max-width: 100%;
   }
 
@@ -2163,7 +2166,7 @@ button.api-warmup:hover,
     width: auto;
     height: 44px;
     padding: 0 14px 0 12px;
-    font-size: 13px;
+    font-size: calc(13px * var(--ui-font-scale));
   }
 
   .app-nav-tab {
@@ -2188,7 +2191,7 @@ button.api-warmup:hover,
   .control input[type="email"],
   .control input[type="password"] {
     min-height: 44px;
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
   }
 
   .combobox--compact .combobox-input {
@@ -2202,7 +2205,7 @@ button.api-warmup:hover,
   }
 
   .zoom-percent-input {
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
   }
 
   .zoom-slider {
@@ -2242,7 +2245,7 @@ button.api-warmup:hover,
     display: flex;
     align-items: center;
     padding: 10px 12px;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
   }
 
   .combobox-list {
@@ -2278,7 +2281,7 @@ button.api-warmup:hover,
   }
 
   .limits-dialog-title {
-    font-size: 22px;
+    font-size: calc(22px * var(--ui-font-scale));
   }
 
   .auth-page {
@@ -2296,7 +2299,7 @@ button.api-warmup:hover,
   }
 
   .auth-heading {
-    font-size: 30px;
+    font-size: calc(30px * var(--ui-font-scale));
   }
 
   .save-row {

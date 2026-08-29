@@ -4,11 +4,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { fetchMe, signOutRequest } from "@/lib/account";
 import type { AuthUser } from "@/lib/types";
+import { warmupOptionsForHost } from "@/lib/startup";
 import { waitForApi, type WarmupStatus } from "@/lib/warmup";
 
 interface AuthContextValue {
   user: AuthUser | null;
+  /** True while pinging `/api/health` — gates scripture/catalog only. */
   loading: boolean;
+  /** True after the first `/api/auth/me` attempt finishes (success or guest). */
+  sessionReady: boolean;
   apiStatus: WarmupStatus;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -26,6 +30,7 @@ export function useAuth(): AuthContextValue {
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
   const [apiStatus, setApiStatus] = useState<WarmupStatus>("warming");
   const [warmupToken, setWarmupToken] = useState(0);
 
@@ -44,26 +49,31 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     const start = async () => {
       setLoading(true);
+      setSessionReady(false);
       setApiStatus("warming");
       try {
-        await waitForApi(abort.signal);
+        const warmup = warmupOptionsForHost(window.location.hostname);
+        await waitForApi(abort.signal, warmup);
         if (cancelled) return;
         setApiStatus("ok");
+        setLoading(false);
+
+        void fetchMe()
+          .then((next) => {
+            if (!cancelled) setUser(next);
+          })
+          .catch(() => {
+            if (!cancelled) setUser(null);
+          })
+          .finally(() => {
+            if (!cancelled) setSessionReady(true);
+          });
       } catch (error) {
         if (cancelled) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
         setApiStatus("error");
         setLoading(false);
-        return;
-      }
-
-      try {
-        const next = await fetchMe();
-        if (!cancelled) setUser(next);
-      } catch {
-        if (!cancelled) setUser(null);
-      } finally {
-        if (!cancelled) setLoading(false);
+        setSessionReady(true);
       }
     };
 
@@ -88,8 +98,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, apiStatus, refresh, signOut, retryWarmup }),
-    [user, loading, apiStatus, refresh, signOut, retryWarmup],
+    () => ({ user, loading, sessionReady, apiStatus, refresh, signOut, retryWarmup }),
+    [user, loading, sessionReady, apiStatus, refresh, signOut, retryWarmup],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

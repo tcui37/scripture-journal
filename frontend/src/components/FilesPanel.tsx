@@ -8,21 +8,18 @@ import PanelSkeleton from "@/components/PanelSkeleton";
 import TrashButton from "@/components/TrashButton";
 import { useAuth } from "@/components/AuthProvider";
 import { useLibrary } from "@/components/LibraryProvider";
-import { fetchPassage } from "@/lib/api";
+import { useFilePageCounts } from "@/hooks/useFilePageCounts";
 import {
   createFile,
   defaultLibraryFileName,
   deleteFile,
   fileCreateBody,
   formatPassageDisplay,
-  friendlyAccountError,
   newestFirst,
   passageFromReference,
-  referenceFromJournalFile,
   updateFile,
 } from "@/lib/account";
-import { countPrintedPages, formatFileMetaLine } from "@/lib/pages";
-import { Measurer } from "@/lib/paginate";
+import { formatFileMetaLine } from "@/lib/pages";
 import type { JournalFile, Reference, Settings } from "@/lib/types";
 
 const FOCUSABLE =
@@ -146,13 +143,14 @@ export default function FilesPanel({
   onOpenFile,
   onActiveLibraryFileChange,
 }: FilesPanelProps) {
-  const { user, loading } = useAuth();
+  const { user, sessionReady } = useAuth();
   const {
     files,
     setFiles,
     filesLoading,
     filesStatus,
     filesFailed,
+    ensureFilesLoaded,
   } = useLibrary();
   const [status, setStatus] = useState("");
   const [failed, setFailed] = useState(false);
@@ -163,10 +161,8 @@ export default function FilesPanel({
   const [renameTarget, setRenameTarget] = useState<JournalFile | null>(null);
   const [renameName, setRenameName] = useState("");
   const [mounted, setMounted] = useState(false);
-  const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
 
-  const measurerRef = useRef<Measurer | null>(null);
-  const [measureReady, setMeasureReady] = useState(false);
+  const pageCounts = useFilePageCounts(files, reference.bibleId, reference.compareId);
 
   const saveTitleId = useId();
   const renameTitleId = useId();
@@ -189,67 +185,8 @@ export default function FilesPanel({
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const measurer = new Measurer();
-    measurerRef.current = measurer;
-
-    let cancelled = false;
-    const markReady = () => {
-      if (!cancelled) setMeasureReady(true);
-    };
-
-    if (document.fonts) void document.fonts.ready.then(markReady);
-    else markReady();
-
-    return () => {
-      cancelled = true;
-      measurer.destroy();
-      measurerRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const measurer = measurerRef.current;
-    if (!measureReady || !measurer || !files.length || !reference.bibleId) {
-      if (!files.length) setPageCounts({});
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    void (async () => {
-      const next: Record<string, number> = {};
-      await Promise.all(
-        files.map(async (file) => {
-          try {
-            const fileReference = referenceFromJournalFile(
-              file,
-              reference.bibleId,
-              reference.compareId,
-            );
-            const primary = await fetchPassage(
-              reference.bibleId,
-              fileReference,
-              controller.signal,
-            );
-            const secondary = reference.compareId
-              ? await fetchPassage(reference.compareId, fileReference, controller.signal)
-              : null;
-            if (cancelled) return;
-            next[file.id] = countPrintedPages(primary, secondary, file.design, measurer);
-          } catch {
-            // Skip rows that fail to load while the list is still usable.
-          }
-        }),
-      );
-      if (!cancelled) setPageCounts(next);
-    })();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [files, measureReady, reference.bibleId, reference.compareId]);
+    ensureFilesLoaded();
+  }, [ensureFilesLoaded]);
 
   useEffect(() => {
     if (!filesStatus) return;
@@ -560,7 +497,7 @@ export default function FilesPanel({
         )
       : null;
 
-  if (loading || (filesLoading && !files.length)) {
+  if (!sessionReady || (filesLoading && !files.length)) {
     return <PanelSkeleton label="Loading files…" />;
   }
 

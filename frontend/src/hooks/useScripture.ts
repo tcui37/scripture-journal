@@ -6,9 +6,9 @@ import {
   fetchBibles,
   fetchBooks,
   fetchLanguages,
-  fetchPassage,
   fetchVerseNumbers,
 } from "@/lib/api";
+import { fetchPassageCached } from "@/lib/passage-cache";
 import { mergeBibles, uniqueLanguages } from "@/lib/bibles";
 import type {
   BibleSummary,
@@ -91,6 +91,7 @@ export function useScripture(
   // Set when a change should pull the end verse to the end of its chapter,
   // which we can only do once that chapter's verse list has arrived.
   const snapEndToLast = useRef(false);
+  const languagesFetchedRef = useRef(false);
 
   const startKey = verseKey(reference, reference.startChapter);
   const endKey = verseKey(reference, reference.endChapter);
@@ -116,30 +117,37 @@ export function useScripture(
 
   /* ── catalogue ───────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    if (!ready) return;
-    const controller = new AbortController();
-    fetchLanguages(controller.signal).then(setLanguages).catch(fail("Languages failed"));
-    return () => controller.abort();
-  }, [ready, fail]);
-
   const selectedKey = selectedLanguages.join(",");
 
   useEffect(() => {
-    if (!ready) return;
-    const missing = selectedLanguages.filter((code) => !(code in biblesByLanguage));
-    if (!missing.length) return;
+    if (!ready) {
+      languagesFetchedRef.current = false;
+      return;
+    }
 
     const controller = new AbortController();
-    Promise.all(
-      missing.map((code) =>
-        fetchBibles(code, controller.signal).then((list) => [code, list] as const),
-      ),
-    )
-      .then((entries) =>
-        setBiblesByLanguage((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
+    const missing = selectedLanguages.filter((code) => !(code in biblesByLanguage));
+
+    if (!languagesFetchedRef.current) {
+      fetchLanguages(controller.signal)
+        .then((list) => {
+          languagesFetchedRef.current = true;
+          setLanguages(list);
+        })
+        .catch(fail("Languages failed"));
+    }
+
+    if (missing.length) {
+      Promise.all(
+        missing.map((code) =>
+          fetchBibles(code, controller.signal).then((list) => [code, list] as const),
+        ),
       )
-      .catch(fail("Versions failed"));
+        .then((entries) =>
+          setBiblesByLanguage((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
+        )
+        .catch(fail("Versions failed"));
+    }
 
     return () => controller.abort();
     // biblesByLanguage is read to skip cached languages; listing it would
@@ -275,9 +283,9 @@ export function useScripture(
     const span = Number(reference.endChapter) - Number(reference.startChapter) + 1;
     begin(span > 1 ? `Fetching ${span} chapters…` : "Fetching text…");
 
-    const primary = fetchPassage(reference.bibleId, reference, controller.signal);
+    const primary = fetchPassageCached(reference.bibleId, reference, controller.signal);
     const compare = reference.compareId
-      ? fetchPassage(reference.compareId, reference, controller.signal)
+      ? fetchPassageCached(reference.compareId, reference, controller.signal)
       : Promise.resolve(null);
 
     Promise.all([primary, compare])

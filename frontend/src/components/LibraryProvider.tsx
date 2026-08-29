@@ -32,10 +32,14 @@ interface LibraryContextValue {
   designsStatus: string;
   filesFailed: boolean;
   designsFailed: boolean;
+  filesLoaded: boolean;
+  designsLoaded: boolean;
   setFiles: Dispatch<SetStateAction<JournalFile[]>>;
   setDesigns: Dispatch<SetStateAction<DesignRecord[]>>;
   getCachedFile: (id: string) => JournalFile | undefined;
   cacheFile: (file: JournalFile) => void;
+  ensureFilesLoaded: () => void;
+  ensureDesignsLoaded: () => void;
   refreshLibrary: () => Promise<void>;
 }
 
@@ -57,9 +61,12 @@ export default function LibraryProvider({ children }: { children: React.ReactNod
   const [designsStatus, setDesignsStatus] = useState("");
   const [filesFailed, setFilesFailed] = useState(false);
   const [designsFailed, setDesignsFailed] = useState(false);
+  const [filesLoaded, setFilesLoaded] = useState(false);
+  const [designsLoaded, setDesignsLoaded] = useState(false);
 
   const fileCacheRef = useRef<Map<string, JournalFile>>(new Map());
-  const prefetchTokenRef = useRef(0);
+  const filesTokenRef = useRef(0);
+  const designsTokenRef = useRef(0);
 
   const getCachedFile = useCallback(
     (id: string) => files.find((file) => file.id === id) ?? fileCacheRef.current.get(id),
@@ -70,49 +77,74 @@ export default function LibraryProvider({ children }: { children: React.ReactNod
     fileCacheRef.current.set(file.id, file);
   }, []);
 
-  const loadLibrary = useCallback(async (token: number) => {
+  const loadFiles = useCallback(async (token: number) => {
     setFilesLoading(true);
-    setDesignsLoading(true);
     setFilesStatus("");
-    setDesignsStatus("");
     setFilesFailed(false);
-    setDesignsFailed(false);
 
-    const [filesResult, designsResult] = await Promise.allSettled([listFiles(), listDesigns()]);
-
-    if (token !== prefetchTokenRef.current) return;
-
-    if (filesResult.status === "fulfilled") {
-      const rows = newestFirst(filesResult.value);
+    try {
+      const rows = newestFirst(await listFiles());
+      if (token !== filesTokenRef.current) return;
       setFiles(rows);
       for (const file of rows) fileCacheRef.current.set(file.id, file);
-    } else {
+      setFilesLoaded(true);
+    } catch (error) {
+      if (token !== filesTokenRef.current) return;
       setFiles([]);
       setFilesFailed(true);
-      setFilesStatus(friendlyAccountError(filesResult.reason, "files"));
+      setFilesStatus(friendlyAccountError(error, "files"));
+    } finally {
+      if (token === filesTokenRef.current) setFilesLoading(false);
     }
-    setFilesLoading(false);
+  }, []);
 
-    if (designsResult.status === "fulfilled") {
-      setDesigns(newestFirst(designsResult.value));
-    } else {
+  const loadDesigns = useCallback(async (token: number) => {
+    setDesignsLoading(true);
+    setDesignsStatus("");
+    setDesignsFailed(false);
+
+    try {
+      const rows = newestFirst(await listDesigns());
+      if (token !== designsTokenRef.current) return;
+      setDesigns(rows);
+      setDesignsLoaded(true);
+    } catch (error) {
+      if (token !== designsTokenRef.current) return;
       setDesigns([]);
       setDesignsFailed(true);
-      setDesignsStatus(friendlyAccountError(designsResult.reason, "designs"));
+      setDesignsStatus(friendlyAccountError(error, "designs"));
+    } finally {
+      if (token === designsTokenRef.current) setDesignsLoading(false);
     }
-    setDesignsLoading(false);
   }, []);
+
+  const ensureFilesLoaded = useCallback(() => {
+    if (!user || apiStatus !== "ok" || filesLoading || filesLoaded) return;
+    const token = filesTokenRef.current + 1;
+    filesTokenRef.current = token;
+    void loadFiles(token);
+  }, [user, apiStatus, filesLoading, filesLoaded, loadFiles]);
+
+  const ensureDesignsLoaded = useCallback(() => {
+    if (!user || apiStatus !== "ok" || designsLoading || designsLoaded) return;
+    const token = designsTokenRef.current + 1;
+    designsTokenRef.current = token;
+    void loadDesigns(token);
+  }, [user, apiStatus, designsLoading, designsLoaded, loadDesigns]);
 
   const refreshLibrary = useCallback(async () => {
     if (!user || apiStatus !== "ok") return;
-    const token = prefetchTokenRef.current + 1;
-    prefetchTokenRef.current = token;
-    await loadLibrary(token);
-  }, [user, apiStatus, loadLibrary]);
+    const filesToken = filesTokenRef.current + 1;
+    const designsToken = designsTokenRef.current + 1;
+    filesTokenRef.current = filesToken;
+    designsTokenRef.current = designsToken;
+    await Promise.all([loadFiles(filesToken), loadDesigns(designsToken)]);
+  }, [user, apiStatus, loadFiles, loadDesigns]);
 
   useEffect(() => {
     if (!user || apiStatus !== "ok") {
-      prefetchTokenRef.current += 1;
+      filesTokenRef.current += 1;
+      designsTokenRef.current += 1;
       fileCacheRef.current.clear();
       setFiles([]);
       setDesigns([]);
@@ -122,13 +154,10 @@ export default function LibraryProvider({ children }: { children: React.ReactNod
       setDesignsStatus("");
       setFilesFailed(false);
       setDesignsFailed(false);
-      return;
+      setFilesLoaded(false);
+      setDesignsLoaded(false);
     }
-
-    const token = prefetchTokenRef.current + 1;
-    prefetchTokenRef.current = token;
-    void loadLibrary(token);
-  }, [user, apiStatus, loadLibrary]);
+  }, [user, apiStatus]);
 
   const value = useMemo(
     () => ({
@@ -141,10 +170,14 @@ export default function LibraryProvider({ children }: { children: React.ReactNod
       designsStatus,
       filesFailed,
       designsFailed,
+      filesLoaded,
+      designsLoaded,
       setFiles,
       setDesigns,
       getCachedFile,
       cacheFile,
+      ensureFilesLoaded,
+      ensureDesignsLoaded,
       refreshLibrary,
     }),
     [
@@ -156,8 +189,12 @@ export default function LibraryProvider({ children }: { children: React.ReactNod
       designsStatus,
       filesFailed,
       designsFailed,
+      filesLoaded,
+      designsLoaded,
       getCachedFile,
       cacheFile,
+      ensureFilesLoaded,
+      ensureDesignsLoaded,
       refreshLibrary,
     ],
   );

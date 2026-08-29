@@ -13,14 +13,14 @@ import { useJournalUi } from "./JournalUiContext";
 export function AccountControl() {
   const pathname = usePathname();
   const journalUi = useJournalUi();
-  const { user, loading, apiStatus } = useAuth();
+  const { user, sessionReady, apiStatus } = useAuth();
   const onJournal = pathname === "/";
   const accountOpen = onJournal && Boolean(journalUi?.accountOpen);
   const signInNext = accountOpen ? "/?account=1" : "/";
 
   // Hide until /me has run against a live API so guests never flash an account
   // icon and signed-in users never flash Sign in.
-  if (loading || apiStatus !== "ok") return null;
+  if (!sessionReady || apiStatus !== "ok") return null;
 
   if (user) {
     if (!onJournal) {

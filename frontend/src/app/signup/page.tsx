@@ -12,7 +12,7 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
-  const { user, loading, refresh, apiStatus } = useAuth();
+  const { user, sessionReady, refresh, apiStatus } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,8 +21,8 @@ function SignupForm() {
   const [checkEmail, setCheckEmail] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace(next);
-  }, [loading, user, router, next]);
+    if (sessionReady && user) router.replace(next);
+  }, [sessionReady, user, router, next]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();

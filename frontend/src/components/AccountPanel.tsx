@@ -10,7 +10,7 @@ import { changePassword, authErrorField, friendlyAccountError } from "@/lib/acco
 
 export default function AccountPanel() {
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, sessionReady, signOut } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordStatus, setPasswordStatus] = useState("");
@@ -43,7 +43,7 @@ export default function AccountPanel() {
     }
   };
 
-  if (loading) {
+  if (!sessionReady) {
     return <PanelSkeleton label="Loading account…" />;
   }
 

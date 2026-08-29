@@ -64,7 +64,7 @@ export default function JournalApp() {
   const searchParams = useSearchParams();
   const landingPanels = readJournalPanelsFromSearch(searchParams);
   const pendingFileIdRef = useRef(landingPanels.fileId);
-  const { user, loading, apiStatus } = useAuth();
+  const { user, sessionReady, apiStatus } = useAuth();
   const { getCachedFile, cacheFile } = useLibrary();
   const [filesOpen, setFilesOpen] = useState(landingPanels.files);
   const [accountOpen, setAccountOpen] = useState(landingPanels.account);
@@ -419,10 +419,10 @@ export default function JournalApp() {
   );
 
   useEffect(() => {
-    if (loading || user || !filesOpen) return;
+    if (!sessionReady || user || !filesOpen) return;
     setFilesOpen(false);
     syncJournalUrl({ files: false });
-  }, [loading, user, filesOpen]);
+  }, [sessionReady, user, filesOpen]);
 
   const handleCloseAccount = useCallback(() => {
     setAccountOpen(false);

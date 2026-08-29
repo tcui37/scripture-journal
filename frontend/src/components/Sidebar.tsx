@@ -205,8 +205,7 @@ export default function Sidebar({
       </div>
 
       <div className="rail-body">
-        {user ? (
-          <div hidden={railView !== "files"} aria-hidden={railView !== "files" || undefined}>
+        {user && railView === "files" ? (
             <FilesPanel
               reference={reference}
               settings={settings}
@@ -215,7 +214,6 @@ export default function Sidebar({
               onOpenFile={onOpenFile}
               onActiveLibraryFileChange={onActiveLibraryFileChange}
             />
-          </div>
         ) : null}
         <div
           hidden={Boolean(user && railView === "files")}
@@ -586,7 +584,14 @@ export default function Sidebar({
           open={openSections.designs ?? false}
           onToggle={(open) => onToggleSection("designs", open)}
         >
-          <DesignsPanel user={user} settings={settings} onSettingsChange={onSettingsChange} />
+          {openSections.designs ? (
+            <DesignsPanel
+              user={user}
+              settings={settings}
+              onSettingsChange={onSettingsChange}
+              active
+            />
+          ) : null}
         </Section>
           </>
         </div>
