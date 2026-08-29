@@ -440,7 +440,7 @@ function footerHtml({
 
   if (lastPage && copyright) {
     out.push(
-      `<div style="${band}bottom:14px;font-size:5.8pt;line-height:1.3;max-height:${NOTICE}px;overflow:hidden">${escapeHtml(copyright)}</div>`,
+      `<div style="${band}bottom:14px;font-size:5.8pt;line-height:1.3;overflow-wrap:anywhere">${escapeHtml(copyright)}</div>`,
     );
   }
 

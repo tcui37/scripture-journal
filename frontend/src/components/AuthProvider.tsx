@@ -53,6 +53,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (cancelled) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
         setApiStatus("error");
+        setLoading(false);
+        return;
       }
 
       try {

@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 #: VERCEL_ENV=development and is treated as local (SINGLE_USER may be true).
 _VERCEL_SHARED_ENVS = frozenset({"production", "preview"})
 
+#: Always omitted on those shared deploys. Local and `vercel dev` still offer
+#: them. Extra ids can still be added with HIDDEN_TRANSLATION_IDS.
+_SHARED_DEPLOY_HIDDEN_IDS = frozenset({"niv"})
+
 
 class Settings(BaseSettings):
     """Application settings, read from the environment or a local .env file."""
@@ -51,6 +55,20 @@ class Settings(BaseSettings):
     #: Default is false. Local `.env` may set SINGLE_USER=true. Vercel
     #: production and preview always force false via get_settings().
     single_user: bool = False
+
+    #: Extra ids or abbreviations to omit, comma-separated (e.g. `nasb,msg`).
+    #: `niv` is already omitted on Vercel production/preview with no env var.
+    hidden_translation_ids: str = ""
+
+    def hidden_ids(self) -> frozenset[str]:
+        configured = frozenset(
+            part.strip().lower()
+            for part in self.hidden_translation_ids.split(",")
+            if part.strip()
+        )
+        if _on_vercel_shared_deploy():
+            return configured | _SHARED_DEPLOY_HIDDEN_IDS
+        return configured
 
 
 def _on_vercel_shared_deploy() -> bool:

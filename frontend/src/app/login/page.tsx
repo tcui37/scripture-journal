@@ -24,6 +24,7 @@ function LoginForm() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (apiStatus !== "ok") return;
     setError("");
     setBusy(true);
     try {
@@ -70,7 +71,7 @@ function LoginForm() {
             />
           </label>
           {error ? <div className="warning">{error}</div> : null}
-          <button type="submit" className="action-button" disabled={busy || apiStatus === "warming"}>
+          <button type="submit" className="action-button" disabled={busy || apiStatus !== "ok"}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

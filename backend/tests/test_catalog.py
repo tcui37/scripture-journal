@@ -15,6 +15,7 @@ from app.catalog import (
     _from_api_bible,
     _from_helloao,
     _is_configured,
+    _omit_hidden,
     _prefer,
     _resolve,
 )
@@ -46,6 +47,34 @@ def test_keyed_sources_appear_once_keys_are_set():
     settings = _settings(api_bible_key="test", esv_api_key="test")
     assert _is_configured(_curated("niv"), settings) is True
     assert _is_configured(_curated("esv"), settings) is True
+
+
+def test_omit_hidden_matches_id_or_abbreviation():
+    fake_niv = Translation(
+        "ab-other-niv",
+        "NIV — Another International Version",
+        "api_bible",
+        "zzzzzzzzzzzzzzzz-01",
+    )
+    kept = {"ab-other-niv": fake_niv, "bbe": _curated("bbe")}
+    omitted = _omit_hidden(kept, frozenset({"niv"}))
+    assert "ab-other-niv" not in omitted
+    assert "bbe" in omitted
+
+
+@pytest.mark.asyncio
+async def test_hidden_translation_ids_omit_niv_from_catalogue():
+    catalog = Catalog(
+        _settings(api_bible_key="test", hidden_translation_ids="niv, nasb"),
+        RaisingHelloAo(),
+        StubApiBible(),
+    )  # type: ignore[arg-type]
+    ids = {entry.id for entry in await catalog.translations()}
+    assert "niv" not in ids
+    assert "nasb" not in ids
+    assert "kjv" in ids
+    assert await catalog.get("niv") is None
+    assert await catalog.get("kjv") is not None
 
 
 def test_trust_order_is_official_then_api_bible_then_helloao():

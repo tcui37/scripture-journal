@@ -44,11 +44,10 @@ export const MARGIN = 54;
 export const FOOTER = 26;
 /**
  * Room reserved at the foot of every sheet for the copyright and provider
- * notices. Always reserved rather than measured, so turning the page footer on
- * or off cannot reflow the text: the notices are a licence condition, not a
- * user preference, and every source supplies at least a translation name.
+ * notices. Always reserved rather than measured, so pagination uses one slot
+ * height. Tall enough for a full ESV (or ESV + NIV) paragraph at 5.8pt.
  */
-export const NOTICE = 26;
+export const NOTICE = 56;
 
 export const INK = "#201e1d";
 export const MUTED = "#82796a";

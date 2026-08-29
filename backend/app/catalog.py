@@ -263,6 +263,21 @@ def _work_key(entry: Translation) -> str | None:
     return None
 
 
+def _is_hidden(entry: Translation, hidden: frozenset[str]) -> bool:
+    if not hidden:
+        return False
+    return entry.id.lower() in hidden or _abbreviation(entry) in hidden
+
+
+def _omit_hidden(
+    kept: dict[str, Translation],
+    hidden: frozenset[str],
+) -> dict[str, Translation]:
+    if not hidden:
+        return kept
+    return {key: entry for key, entry in kept.items() if not _is_hidden(entry, hidden)}
+
+
 def _prefer(entries: list[Translation]) -> dict[str, Translation]:
     """One listing per work, keeping the more trusted source.
 
@@ -417,7 +432,10 @@ class Catalog:
                         if (resolved := _resolve(entry, self._settings)) is not None
                     ]
                     discovered = await self._discover()
-                    self._dynamic = _prefer([*curated, *discovered])
+                    self._dynamic = _omit_hidden(
+                        _prefer([*curated, *discovered]),
+                        self._settings.hidden_ids(),
+                    )
 
         return self._dynamic
 

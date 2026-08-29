@@ -25,6 +25,7 @@ function SignupForm() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (apiStatus !== "ok") return;
     setError("");
     setBusy(true);
     try {
@@ -99,7 +100,7 @@ function SignupForm() {
                 />
               </label>
               {error ? <div className="warning">{error}</div> : null}
-              <button type="submit" className="action-button" disabled={busy || apiStatus === "warming"}>
+              <button type="submit" className="action-button" disabled={busy || apiStatus !== "ok"}>
                 {busy ? "Creating…" : "Create account"}
               </button>
             </form>

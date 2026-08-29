@@ -1,4 +1,5 @@
-/** Keep in sync with `@media screen and (max-width: 768px)` in globals.css. */
+/** Keep in sync with `@media screen and (max-width: 768px)` and
+ *  `@container preview (min-width: 769px)` in globals.css. */
 export const NARROW_UI_MAX_PX = 768;
 
 export const PREVIEW_GUTTER_WIDE = 90;

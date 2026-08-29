@@ -234,3 +234,25 @@ describe("titleLine", () => {
     assert.doesNotMatch(html, /John 3:16  ·  NIV/);
   });
 });
+
+describe("copyright notice", () => {
+  const longNotice =
+    "Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.";
+
+  it("prints the full last-page notice without clipping it", () => {
+    const html = pageHtml({
+      slots: ["<p>text</p>"],
+      pageNumber: 1,
+      total: 1,
+      blank: false,
+      reference: "John 3:16",
+      citation: "ESV",
+      sources: "esv.org",
+      copyright: longNotice,
+      settings: settings(),
+    });
+    assert.match(html, /Used by permission\. All rights reserved\./);
+    assert.match(html, /overflow-wrap:anywhere/);
+    assert.doesNotMatch(html, /max-height:\d+px;overflow:hidden/);
+  });
+});

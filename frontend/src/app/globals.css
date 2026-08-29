@@ -76,8 +76,7 @@ button {
   width: 352px;
   flex: none;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--color-neutral-100);
   border-right: 1px solid var(--color-divider);
   display: flex;
@@ -97,8 +96,7 @@ button {
 }
 
 .rail-header,
-.rail-body,
-.rail-footer {
+.rail-body {
   min-width: 351px;
 }
 
@@ -173,11 +171,16 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .rail-footer {
-  margin-top: auto;
-  padding: var(--space-4) var(--space-6) var(--space-6);
+  flex: none;
+  margin-top: var(--space-2);
+  padding: var(--space-4) 0 0;
   border-top: 1px solid var(--color-divider);
   display: flex;
   flex-direction: column;
@@ -185,9 +188,11 @@ button {
 }
 
 .copyright {
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--color-neutral-500);
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 .copyright a {
@@ -202,7 +207,7 @@ button {
   padding-bottom: var(--space-3);
 }
 
-.section:last-child {
+.section:last-of-type {
   border-bottom: none;
   padding-bottom: 0;
 }
@@ -260,6 +265,8 @@ button {
   flex-direction: column;
   gap: 10px;
   padding-top: 10px;
+  /* Hang controls under the section name, after the 01 index. */
+  padding-left: 25px;
 }
 
 .control {
@@ -309,19 +316,27 @@ button {
 .chip-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 5px 6px 5px 11px;
+  gap: 4px;
+  box-sizing: border-box;
+  min-height: 39px;
+  padding: 0 14px;
   background: var(--color-neutral-100);
   border: 1px solid var(--color-neutral-300);
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1;
   color: var(--color-text);
+}
+
+.chip:has(.chip-remove) {
+  padding-right: 6px;
 }
 
 .chip-remove {
@@ -715,9 +730,14 @@ button {
   text-decoration: none;
 }
 
-.link-button:hover {
+.link-button:hover:not(:disabled) {
   border-color: var(--color-accent);
   color: var(--color-accent-700);
+}
+
+.link-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .action-button {
@@ -873,6 +893,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-left: 25px;
 }
 
 .identity-chip {
@@ -1006,13 +1027,15 @@ button {
   flex: 1;
   min-width: 0;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--color-surface);
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
+  flex: none;
+  position: relative;
   z-index: 5;
   display: flex;
   align-items: center;
@@ -1131,26 +1154,48 @@ button {
   cursor: not-allowed;
 }
 
-.desk-inner {
-  padding: var(--space-8) var(--space-6) 60px;
-  display: block;
-}
-
-.preview-scroll {
-  display: flex;
-  justify-content: flex-start;
-  overflow-x: auto;
+.preview-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  scrollbar-gutter: stable;
+  container-type: inline-size;
+  container-name: preview;
 }
 
-.preview-scroll.is-fit {
-  justify-content: center;
+.preview-stage:focus-visible {
+  outline: none;
+}
+
+.preview-stage.is-panning {
+  cursor: grabbing;
+}
+
+.preview-canvas {
+  box-sizing: border-box;
+  width: max-content;
+  margin-inline: auto;
+  padding: 16px 12px 40px;
+}
+
+/* Match `previewGutter()` / `NARROW_UI_MAX_PX` so Fit never clips. */
+@container preview (min-width: 769px) {
+  .preview-canvas {
+    padding: var(--space-8) var(--space-6) 60px;
+  }
 }
 
 .pagestack {
   display: flex;
   flex-direction: column;
   gap: 30px;
+  flex-shrink: 0;
 }
 
 .jpage {
@@ -1501,12 +1546,7 @@ button.api-warmup:hover,
   .rail-body {
     padding-left: max(var(--space-4), env(safe-area-inset-left));
     padding-right: max(var(--space-4), env(safe-area-inset-right));
-  }
-
-  .rail-footer {
-    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
-    padding-left: max(var(--space-4), env(safe-area-inset-left));
-    padding-right: max(var(--space-4), env(safe-area-inset-right));
+    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
   }
 
   .rail-title {
@@ -1661,6 +1701,10 @@ button.api-warmup:hover,
     align-items: center;
   }
 
+  .chip {
+    min-height: 44px;
+  }
+
   .chip-remove {
     width: 32px;
     height: 32px;
@@ -1690,14 +1734,6 @@ button.api-warmup:hover,
     flex-wrap: wrap;
     max-width: 100%;
     line-height: 1.3;
-  }
-
-  .desk-inner {
-    padding: 16px 12px 40px;
-  }
-
-  .preview-scroll {
-    scrollbar-gutter: stable;
   }
 
   .limits-dialog-root {
@@ -1784,16 +1820,25 @@ button.api-warmup:hover,
 
   .desk {
     overflow: visible !important;
+    display: block;
     background: #fff !important;
   }
 
-  .desk-inner {
-    padding: 0 !important;
+  .preview-stage {
+    overflow: visible !important;
+    height: auto !important;
+    flex: none;
+    display: block;
+    cursor: auto;
+    user-select: auto;
+    -webkit-user-select: auto;
   }
 
-  .preview-scroll {
-    display: block !important;
-    overflow: visible !important;
+  .preview-canvas {
+    display: block;
+    width: auto;
+    padding: 0 !important;
+    margin: 0;
   }
 
   .app {

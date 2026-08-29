@@ -21,12 +21,14 @@ export function AccountControl() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading } = useAuth();
+  const { user, loading, apiStatus } = useAuth();
   const onJournal = pathname === "/";
   const accountOpen = onJournal && searchParams.get("account") === "1";
   const signInNext = accountOpen ? "/?account=1" : "/";
 
-  if (loading) return null;
+  // Hide until /me has run against a live API so guests never flash an account
+  // icon and signed-in users never flash Sign in.
+  if (loading || apiStatus !== "ok") return null;
 
   if (user) {
     if (!onJournal) {

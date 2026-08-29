@@ -1,7 +1,15 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { useScripture } from "@/hooks/useScripture";
 import { AccountError, authHref, fetchFile } from "@/lib/account";
@@ -36,6 +44,8 @@ import Sidebar, { type RailView } from "./Sidebar";
 
 type ZoomId = (typeof ZOOM_OPTIONS)[number]["id"];
 
+const ZOOM_IDS: ZoomId[] = ZOOM_OPTIONS.map((option) => option.id);
+
 /** Trimmed, de-duplicated, empties dropped — for assembling licence notices. */
 const unique = (parts: (string | undefined)[]) =>
   Array.from(new Set(parts.map((part) => part?.trim()).filter(Boolean) as string[]));
@@ -49,10 +59,12 @@ export default function JournalApp() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileId = searchParams.get("file");
-  const filesOpen = searchParams.get("files") === "1";
+  const filesRequested = searchParams.get("files") === "1";
   const accountOpen = searchParams.get("account") === "1";
+  const { user, loading, apiStatus } = useAuth();
+  // Hide Files until the session is known so guests never flash that panel.
+  const filesOpen = Boolean(user) && filesRequested;
   const railView: RailView = filesOpen ? "files" : "design";
-  const { user, apiStatus } = useAuth();
   const [hydrated, setHydrated] = useState(false);
   const [fileStatus, setFileStatus] = useState("");
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -70,7 +82,7 @@ export default function JournalApp() {
   const scripture = useScripture(
     initial.reference,
     initial.languages,
-    hydrated && apiStatus !== "warming",
+    hydrated && apiStatus === "ok",
   );
   const { reference, passage, comparePassage, status, failed, setReference } = scripture;
   const referenceRef = useRef(reference);
@@ -115,7 +127,7 @@ export default function JournalApp() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated || !fileId || apiStatus === "warming") return;
+    if (!hydrated || !fileId || apiStatus !== "ok") return;
 
     let cancelled = false;
     fetchFile(fileId)
@@ -276,6 +288,15 @@ export default function JournalApp() {
   /* ── zoom ────────────────────────────────────────────────────────────── */
 
   const deskRef = useRef<HTMLElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const panRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    sl: number;
+    st: number;
+    moved: boolean;
+  } | null>(null);
   const [zoom, setZoom] = useState<ZoomId>("fit");
   const [scale, setScale] = useState(0.62);
 
@@ -286,16 +307,87 @@ export default function JournalApp() {
       setScale(Number(zoom));
       return;
     }
+    const stage = stageRef.current;
     const desk = deskRef.current;
-    if (!desk) return;
+    if (!stage) return;
 
-    const update = () => setScale(fitPreviewScale(desk.clientWidth, sheet.width));
+    const update = () => setScale(fitPreviewScale(stage.clientWidth, sheet.width));
 
     update();
     const observer = new ResizeObserver(update);
-    observer.observe(desk);
+    observer.observe(stage);
+    if (desk) observer.observe(desk);
     return () => observer.disconnect();
-  }, [zoom, sheet.width]);
+  }, [zoom, sheet.width, railCollapsed]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    let lastStep = 0;
+    const onWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      const now = Date.now();
+      if (now - lastStep < 120) return;
+      lastStep = now;
+      const direction = event.deltaY > 0 ? -1 : 1;
+      setZoom((current) => {
+        const index = ZOOM_IDS.indexOf(current);
+        const next = Math.min(ZOOM_IDS.length - 1, Math.max(0, index + direction));
+        return ZOOM_IDS[next] ?? current;
+      });
+    };
+
+    stage.addEventListener("wheel", onWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const stopPan = useCallback((pointerId: number) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== pointerId) return;
+    stageRef.current?.classList.remove("is-panning");
+    panRef.current = null;
+  }, []);
+
+  const handleStagePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
+    if (event.button !== 0) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    panRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      sl: stage.scrollLeft,
+      st: stage.scrollTop,
+      moved: false,
+    };
+    stage.setPointerCapture(event.pointerId);
+  }, []);
+
+  const handleStagePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    const stage = stageRef.current;
+    if (!pan || pan.pointerId !== event.pointerId || !stage) return;
+    const dx = event.clientX - pan.x;
+    const dy = event.clientY - pan.y;
+    if (!pan.moved && dx * dx + dy * dy < 9) return;
+    if (!pan.moved) {
+      pan.moved = true;
+      stage.classList.add("is-panning");
+    }
+    event.preventDefault();
+    stage.scrollLeft = pan.sl - dx;
+    stage.scrollTop = pan.st - dy;
+  }, []);
+
+  const handleStagePointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      stopPan(event.pointerId);
+    },
+    [stopPan],
+  );
 
   /* ── handlers ────────────────────────────────────────────────────────── */
 
@@ -315,8 +407,12 @@ export default function JournalApp() {
     (view: RailView) => {
       const params = new URLSearchParams(searchParams.toString());
       if (view === "files") {
-        params.set("files", "1");
-        setRailCollapsed(false);
+        if (!user) {
+          params.delete("files");
+        } else {
+          params.set("files", "1");
+          setRailCollapsed(false);
+        }
       } else {
         params.delete("files");
         setDesignFocusToken((token) => token + 1);
@@ -326,8 +422,16 @@ export default function JournalApp() {
       const query = params.toString();
       router.push(query ? `/?${query}` : "/");
     },
-    [router, searchParams],
+    [router, searchParams, user],
   );
+
+  useEffect(() => {
+    if (loading || user || !filesRequested) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("files");
+    const query = params.toString();
+    router.replace(query ? `/?${query}` : "/");
+  }, [loading, user, filesRequested, router, searchParams]);
 
   const handleCloseAccount = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -456,7 +560,10 @@ export default function JournalApp() {
     return `${referenceLabel} · ${chapters} · ${pageCountLabel}`;
   }, [bookName, pages, chapterSpan, referenceLabel, pageCountLabel]);
 
-  const statusText = fileStatus || status || (pages ? pageCountLabel : "");
+  const statusText =
+    fileStatus ||
+    (apiStatus === "ok" ? status : "") ||
+    (pages ? pageCountLabel : "");
 
   return (
     <div className="app">
@@ -580,8 +687,20 @@ export default function JournalApp() {
           </div>
         </div>
 
-        <div className="desk-inner">
-          <div className={`preview-scroll${zoom === "fit" ? " is-fit" : ""}`}>
+        <div
+          className="preview-stage"
+          ref={stageRef}
+          tabIndex={0}
+          role="region"
+          aria-label="Journal page preview"
+          onPointerDown={handleStagePointerDown}
+          onPointerMove={handleStagePointerMove}
+          onPointerUp={handleStagePointerUp}
+          onPointerCancel={handleStagePointerUp}
+          onLostPointerCapture={handleStagePointerUp}
+          onDragStart={(event) => event.preventDefault()}
+        >
+          <div className="preview-canvas">
             {pages ? (
               <PageStack
                 pages={pages}

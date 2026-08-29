@@ -53,3 +53,40 @@ def test_vercel_production_warns_when_overriding(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger="app.config"):
         get_settings()
     assert any("SINGLE_USER" in record.message for record in caplog.records)
+
+
+def test_hidden_translation_ids_parse_comma_list(monkeypatch):
+    monkeypatch.setenv("HIDDEN_TRANSLATION_IDS", "niv, NASB")
+    monkeypatch.delenv("VERCEL_ENV", raising=False)
+    assert get_settings().hidden_ids() == frozenset({"niv", "nasb"})
+
+
+def test_hidden_translation_ids_empty_by_default(monkeypatch):
+    monkeypatch.delenv("HIDDEN_TRANSLATION_IDS", raising=False)
+    monkeypatch.delenv("VERCEL_ENV", raising=False)
+    assert get_settings().hidden_ids() == frozenset()
+
+
+def test_vercel_production_hides_niv_automatically(monkeypatch):
+    monkeypatch.delenv("HIDDEN_TRANSLATION_IDS", raising=False)
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    assert "niv" in get_settings().hidden_ids()
+
+
+def test_vercel_preview_hides_niv_automatically(monkeypatch):
+    monkeypatch.delenv("HIDDEN_TRANSLATION_IDS", raising=False)
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    assert "niv" in get_settings().hidden_ids()
+
+
+def test_vercel_dev_still_offers_niv(monkeypatch):
+    monkeypatch.delenv("HIDDEN_TRANSLATION_IDS", raising=False)
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("VERCEL_ENV", "development")
+    assert "niv" not in get_settings().hidden_ids()
+
+
+def test_vercel_production_merges_extra_hidden_ids(monkeypatch):
+    monkeypatch.setenv("HIDDEN_TRANSLATION_IDS", "nasb")
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    assert get_settings().hidden_ids() == frozenset({"niv", "nasb"})

@@ -72,12 +72,16 @@ export function useScripture(
   const [passage, setPassage] = useState<Passage | null>(null);
   const [comparePassage, setComparePassage] = useState<Passage | null>(null);
   const [reference, setReferenceState] = useState<Reference>(initial);
-  const [status, setStatus] = useState("Loading…");
+  const [status, setStatus] = useState("");
   const [failed, setFailed] = useState(false);
 
   // localStorage is read after mount; apply it once before any translation fetch.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready) {
+      setFailed(false);
+      setStatus("");
+      return;
+    }
     setSelectedLanguages(uniqueLanguages(initialLanguages));
     setReferenceState(initial);
     // Intentionally once, when the parent has finished reading storage.
@@ -113,10 +117,11 @@ export function useScripture(
   /* ── catalogue ───────────────────────────────────────────────────────── */
 
   useEffect(() => {
+    if (!ready) return;
     const controller = new AbortController();
     fetchLanguages(controller.signal).then(setLanguages).catch(fail("Languages failed"));
     return () => controller.abort();
-  }, [fail]);
+  }, [ready, fail]);
 
   const selectedKey = selectedLanguages.join(",");
 

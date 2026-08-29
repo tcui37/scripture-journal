@@ -156,30 +156,32 @@ export default function Sidebar({
           </button>
         </div>
         <div className="rail-tagline">A passage, a wide margin, room to write.</div>
-        <div className="rail-mode" role="radiogroup" aria-label="Rail view">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={railView === "design"}
-            className={`opt${railView === "design" ? " is-on" : ""}`}
-            onClick={() => onRailViewChange("design")}
-          >
-            Design
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={railView === "files"}
-            className={`opt${railView === "files" ? " is-on" : ""}`}
-            onClick={() => onRailViewChange("files")}
-          >
-            Files
-          </button>
-        </div>
+        {user ? (
+          <div className="rail-mode" role="radiogroup" aria-label="Rail view">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={railView === "design"}
+              className={`opt${railView === "design" ? " is-on" : ""}`}
+              onClick={() => onRailViewChange("design")}
+            >
+              Design
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={railView === "files"}
+              className={`opt${railView === "files" ? " is-on" : ""}`}
+              onClick={() => onRailViewChange("files")}
+            >
+              Files
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="rail-body">
-        {railView === "files" ? (
+        {user && railView === "files" ? (
           <FilesPanel />
         ) : (
           <>
@@ -363,10 +365,10 @@ export default function Sidebar({
           </div>
 
           <div className="quick-row">
-            <button type="button" className="link-button" onClick={wholeChapter}>
+            <button type="button" className="link-button" onClick={wholeChapter} disabled={!book}>
               Whole chapter
             </button>
-            <button type="button" className="link-button" onClick={entireBook}>
+            <button type="button" className="link-button" onClick={entireBook} disabled={!book}>
               Entire book
             </button>
           </div>
@@ -573,6 +575,7 @@ export default function Sidebar({
           />
         </Section>
 
+        {user ? (
         <Section
           index="05"
           title="Designs"
@@ -583,17 +586,18 @@ export default function Sidebar({
             <DesignsPanel user={user} settings={settings} onSettingsChange={onSettingsChange} />
           </div>
         </Section>
+        ) : null}
           </>
         )}
-      </div>
 
-      {copyright ? (
-        <div className="rail-footer">
-          {/* api.bible and Crossway both require a visible, working link
-              wherever their text is shown, so bare URLs become anchors. */}
-          <div className="copyright">{linkify(copyright)}</div>
-        </div>
-      ) : null}
+        {copyright ? (
+          <div className="rail-footer">
+            {/* api.bible and Crossway both require a visible, working link
+                wherever their text is shown, so bare URLs become anchors. */}
+            <div className="copyright">{linkify(copyright)}</div>
+          </div>
+        ) : null}
+      </div>
     </aside>
   );
 }
