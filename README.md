@@ -23,9 +23,10 @@ backend/          FastAPI — keys, four upstreams, accounts
   .vercelignore    .venv, .env, tests, caches
 frontend/         Next.js App Router — layout, pagination, print
   next.config.ts   rewrites /api/:path* → $API_URL/api/:path* (build-time)
+  src/app/globals.css   design tokens and UI styles (source of truth for the app)
   .env.example     API_URL
   .vercelignore    .env, .next, node_modules
-supabase/         SQL migrations for accounts, files, designs
+supabase/         SQL migrations for accounts, files, saved page layouts
 ```
 
 ### Translation sources
@@ -151,6 +152,11 @@ npm run dev                            # http://localhost:3000
 Next.js proxies `/api/*` to the backend, so both run on one origin and API keys
 never reach the browser. Docs: <http://127.0.0.1:8000/docs>.
 
+**Both processes are required locally.** The frontend alone can load scripture,
+but sign-in, saved files, and saved page layouts need the backend on `:8000`.
+Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `backend/.env` for account
+storage (see Environment variables).
+
 ## Environment variables
 
 Names only — never commit values. Local: `backend/.env`, `frontend/.env.local`
@@ -164,7 +170,7 @@ Names only — never commit values. Local: `backend/.env`, `frontend/.env.local`
 | `API_BIBLE_BASE_URL` | backend | default `https://rest.api.bible/v1` | same |
 | `CORS_ORIGINS` | backend | default `["http://localhost:3000"]` | JSON array of the frontend origin, e.g. `["https://….vercel.app"]` |
 | `REQUEST_TIMEOUT` | backend | default `20.0` | same |
-| `SUPABASE_URL` | backend | for accounts / files / designs | required for those features |
+| `SUPABASE_URL` | backend | for accounts / files / saved layouts | required for those features |
 | `SUPABASE_ANON_KEY` | backend | `.env` | required for those features |
 | `SINGLE_USER` | backend | `true` allowed locally | **forced `false`** on production and preview. `vercel dev` (`VERCEL_ENV=development`) counts as local |
 | `HIDDEN_TRANSLATION_IDS` | backend | leave unset | extra ids to omit, e.g. `nasb,msg`. **NIV is already omitted** on production and preview |
@@ -218,8 +224,18 @@ Whole-book exports issue one request per chapter and can exceed Hobby
 
 ## Notes
 
-- Settings, current reference, and open sidebar sections persist in
-  `localStorage`.
+### Visual design
+
+Visual implementation is in `frontend/src/app/globals.css`. Design patterns
+adapted from [cursor-designer](https://github.com/spencergoldade/cursor-designer)
+by [Spencer Goldade](https://spencergoldade.ca).
+
+### App behaviour
+
+- Settings, current reference, open sidebar sections, and rail collapse (desktop)
+  persist in `localStorage`.
+- Signed-in users can save **page layouts** (typography, margins, paper — not
+  scripture) and **journal files** (passage + layout) via Supabase.
 - When printing, leave margins at none. Ruled lines and paper tint survive
   "Background graphics" off (`.jpage` uses `print-color-adjust: exact`).
 - In-process caches help little on serverless: each cold start starts empty, so

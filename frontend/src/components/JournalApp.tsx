@@ -28,7 +28,12 @@ import {
   STORAGE_KEY,
   ZOOM_OPTIONS,
 } from "@/lib/constants";
-import { fitPreviewScale, narrowUiQuery, startRailCollapsed } from "@/lib/layout";
+import {
+  fitPreviewScale,
+  narrowUiQuery,
+  readPreviewPaddingInline,
+  startRailCollapsed,
+} from "@/lib/layout";
 import { printFilename } from "@/lib/filename";
 import { checkLimits } from "@/lib/limits";
 import { Measurer, paginate } from "@/lib/paginate";
@@ -39,6 +44,7 @@ import type { Reference, Settings } from "@/lib/types";
 import AppNav, { AccountControl } from "./AppNav";
 import AccountSidecar from "./AccountSidecar";
 import { useAuth } from "./AuthProvider";
+import Combobox from "./Combobox";
 import PageStack from "./PageStack";
 import Sidebar, { type RailView } from "./Sidebar";
 
@@ -107,7 +113,13 @@ export default function JournalApp() {
           compareLanguage?: string;
         };
         if (parsed.settings) setSettings((prev) => ({ ...prev, ...parsed.settings }));
-        if (parsed.openSections) setOpenSections(parsed.openSections);
+        if (parsed.openSections) {
+          setOpenSections(
+            Object.fromEntries(
+              Object.entries(parsed.openSections).filter(([, open]) => open),
+            ),
+          );
+        }
         if (typeof parsed.railCollapsed === "boolean") storedRail = parsed.railCollapsed;
         setInitial({
           reference: { ...DEFAULT_REFERENCE, ...parsed.reference },
@@ -165,13 +177,22 @@ export default function JournalApp() {
   useEffect(() => {
     if (!hydrated) return;
     try {
+      const narrow = window.matchMedia(narrowUiQuery()).matches;
+      const existing = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<
+        string,
+        unknown
+      >;
       window.localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
+          ...existing,
           settings,
           reference,
-          openSections,
-          railCollapsed,
+          openSections: Object.fromEntries(
+            Object.entries(openSections).filter(([, open]) => open),
+          ),
+          // Phone layout forces the rail closed; keep the desktop preference.
+          ...(narrow ? {} : { railCollapsed }),
           languages: scripture.selectedLanguages,
         }),
       );
@@ -311,13 +332,24 @@ export default function JournalApp() {
     const desk = deskRef.current;
     if (!stage) return;
 
-    const update = () => setScale(fitPreviewScale(stage.clientWidth, sheet.width));
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const canvas = stage.querySelector(".preview-canvas");
+        const paddingInline = readPreviewPaddingInline(canvas, stage.clientWidth);
+        setScale(fitPreviewScale(stage.clientWidth, sheet.width, paddingInline));
+      });
+    };
 
     update();
     const observer = new ResizeObserver(update);
     observer.observe(stage);
     if (desk) observer.observe(desk);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [zoom, sheet.width, railCollapsed]);
 
   useEffect(() => {
@@ -396,10 +428,14 @@ export default function JournalApp() {
     [],
   );
 
-  const handleToggleSection = useCallback(
-    (id: string, open: boolean) => setOpenSections((prev) => ({ ...prev, [id]: open })),
-    [],
-  );
+  const handleToggleSection = useCallback((id: string, open: boolean) => {
+    setOpenSections((prev) => {
+      if (open) return { ...prev, [id]: true };
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
 
   const handleToggleRail = useCallback(() => setRailCollapsed((prev) => !prev), []);
 
@@ -442,6 +478,28 @@ export default function JournalApp() {
 
   useEffect(() => {
     if (filesOpen) setRailCollapsed(false);
+  }, [filesOpen]);
+
+  useEffect(() => {
+    const mq = window.matchMedia(narrowUiQuery());
+    const syncRail = () => {
+      if (mq.matches) {
+        setRailCollapsed(startRailCollapsed(true, filesOpen));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as {
+          railCollapsed?: boolean;
+        };
+        setRailCollapsed(
+          typeof parsed.railCollapsed === "boolean" ? parsed.railCollapsed : false,
+        );
+      } catch {
+        setRailCollapsed(false);
+      }
+    };
+    mq.addEventListener("change", syncRail);
+    return () => mq.removeEventListener("change", syncRail);
   }, [filesOpen]);
 
   useEffect(() => {
@@ -570,6 +628,9 @@ export default function JournalApp() {
       {/* @page can't read CSS variables, so the rule is generated per setting. */}
       <style>{`@page { size: ${cssPageSize(settings.pageSize)} ${settings.orientation}; margin: 0; }`}</style>
 
+      <a href="#journal-main" className="skip-link">
+        Skip to page preview
+      </a>
       <Sidebar
         scripture={scripture}
         settings={settings}
@@ -590,12 +651,13 @@ export default function JournalApp() {
         <button
           type="button"
           className="rail-backdrop"
-          aria-label="Close settings"
+          aria-label="Hide settings"
           onClick={handleToggleRail}
         />
       ) : null}
 
-      <main className="desk" ref={deskRef}>
+      <main id="journal-main" className="desk" ref={deskRef} tabIndex={-1}>
+        <h1 className="visually-hidden">Scripture Journal</h1>
         <div className="topbar">
           <div className="topbar-left">
             {railCollapsed ? (
@@ -625,7 +687,11 @@ export default function JournalApp() {
             ) : null}
             <div className="topbar-copy">
               <div className="topbar-reference">{referenceLabel}</div>
-              <div className={`topbar-status${failed || fileStatus ? " is-error" : ""}`}>
+              <div
+                className={`topbar-status${failed || fileStatus ? " is-error" : ""}`}
+                role="status"
+                aria-live="polite"
+              >
                 {statusText}
               </div>
             </div>
@@ -635,30 +701,27 @@ export default function JournalApp() {
               <AppNav />
             </Suspense>
             <div className="zoom-row">
-              <label className="zoom-select">
+              <div className="zoom-select">
                 <span className="zoom-select-label">Zoom</span>
-                <select
+                <Combobox
+                  label="Zoom"
+                  options={ZOOM_OPTIONS}
                   value={zoom}
-                  aria-label="Zoom"
-                  onChange={(event) => setZoom(event.target.value as ZoomId)}
-                >
-                  {ZOOM_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onChange={(next) => setZoom(next as ZoomId)}
+                  searchable={false}
+                  className="combobox--compact"
+                />
+              </div>
 
               <button
                 type="button"
-                className="download-button"
+                className="download-button is-label"
                 onClick={() => window.print()}
                 disabled={!canPrint}
                 aria-label="Print or save as PDF"
                 title={
                   canPrint
-                    ? `Print / save as PDF — ${pageCountLabel}`
+                    ? `Print or save as PDF — ${pageCountLabel}`
                     : limitCheck.ok
                       ? "Nothing to print yet"
                       : limitCheck.message
@@ -679,6 +742,7 @@ export default function JournalApp() {
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
+                Print
               </button>
             </div>
             <Suspense>

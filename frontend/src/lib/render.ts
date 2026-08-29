@@ -70,7 +70,9 @@ export function verseHtml(verse: Verse, settings: Settings) {
 
   for (const segment of verse.segments) {
     let style = "";
-    if (segment.wj && settings.wordsOfChrist) style += `color:${WORDS_OF_CHRIST};`;
+    if (segment.wj && settings.wordsOfChrist) {
+      style += `color:${WORDS_OF_CHRIST};text-decoration:underline;`;
+    }
     if (segment.italic) style += "font-style:italic;";
     html += style
       ? `<span style="${style}">${escapeHtml(segment.text)}</span>`

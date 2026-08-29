@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 
 import GuestPrompt from "@/components/GuestPrompt";
+import PanelSkeleton from "@/components/PanelSkeleton";
 import TrashButton from "@/components/TrashButton";
 import {
   createDesign,
   deleteDesign,
+  friendlyAccountError,
   listDesigns,
   newestFirst,
   sameDesign,
@@ -26,14 +28,17 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+  const [listLoading, setListLoading] = useState(Boolean(user));
 
   useEffect(() => {
     if (!user) {
       setDesigns([]);
+      setListLoading(false);
       return;
     }
 
     let cancelled = false;
+    setListLoading(true);
     listDesigns()
       .then((rows) => {
         if (!cancelled) {
@@ -45,8 +50,11 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
       .catch((error: unknown) => {
         if (!cancelled) {
           setFailed(true);
-          setStatus(error instanceof Error ? error.message : "Could not load designs");
+          setStatus(friendlyAccountError(error, "designs"));
         }
+      })
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
       });
 
     return () => {
@@ -61,6 +69,10 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
         message="A Design is layout, type, and text styles — not scripture or translation. Sign in to save, apply, and remove them."
       />
     );
+  }
+
+  if (listLoading) {
+    return <PanelSkeleton label="Loading designs…" />;
   }
 
   const notice = (text: string, error = false) => {
@@ -79,7 +91,7 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
       const saved = await createDesign(trimmed, settings);
       setDesigns((prev) => newestFirst([saved, ...prev.filter((row) => row.id !== saved.id)]));
       setName("");
-      notice("Saved.");
+      notice("Saved. Apply it from the list below.");
     } catch (error) {
       notice(error instanceof Error ? error.message : "Could not save design", true);
     } finally {
@@ -90,7 +102,7 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
   const handleRemove = async (id: string) => {
     if (pendingRemove !== id) {
       setPendingRemove(id);
-      notice("Press the trash icon again to confirm.");
+      notice("Press Confirm to remove this design.");
       return;
     }
     setBusy(true);
@@ -98,7 +110,7 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
       await deleteDesign(id);
       setDesigns((prev) => prev.filter((row) => row.id !== id));
       setPendingRemove(null);
-      notice("Removed.");
+      notice("Removed from your designs.");
     } catch (error) {
       notice(error instanceof Error ? error.message : "Could not remove design", true);
     } finally {
@@ -106,13 +118,21 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
     }
   };
 
-  const apply = (design: Design) => {
+  const apply = (design: Design, name: string, alreadyOn: boolean) => {
+    if (
+      !alreadyOn &&
+      !window.confirm(
+        `Apply “${name}”? The current layout will change. Save it under Designs first if you want to keep it.`,
+      )
+    ) {
+      return;
+    }
     onSettingsChange(design);
-    notice("Applied.");
+    notice(alreadyOn ? "This design is already in use." : "Applied. The page preview uses this layout.");
   };
 
   return (
-    <>
+    <div className="designs-panel" id="rail-designs">
       <p className="panel-note">Layout, type, and text styles — not scripture or translation.</p>
       <div className="save-row">
         <label className="control save-row-field">
@@ -149,7 +169,7 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
                 <button
                   type="button"
                   className="record-main"
-                  onClick={() => apply(row.settings)}
+                  onClick={() => apply(row.settings, row.name, applied)}
                   aria-pressed={applied}
                   title="Apply this design"
                 >
@@ -167,10 +187,16 @@ export default function DesignsPanel({ user, settings, onSettingsChange }: Desig
           })}
         </ul>
       ) : (
-        <p className="panel-note">No designs yet. Set the page how you like it, name it, and save.</p>
+        <p className="panel-note">
+          No designs yet. Set the page how you like it, name it, and Save — it will show up here.
+        </p>
       )}
 
-      {status ? <div className={failed ? "warning" : "summary"}>{status}</div> : null}
-    </>
+      {status ? (
+        <div className={failed ? "warning" : "summary"} role={failed ? "alert" : "status"}>
+          {status}
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -33,8 +33,9 @@ export function AccountControl() {
   if (user) {
     if (!onJournal) {
       return (
-        <Link href="/?account=1" className="account-icon" title={user.email} aria-label="Account">
+        <Link href="/?account=1" className="account-icon is-label" title={user.email} aria-label="Account">
           <AccountIcon />
+          Account
         </Link>
       );
     }
@@ -42,7 +43,7 @@ export function AccountControl() {
     return (
       <button
         type="button"
-        className={`account-icon${accountOpen ? " is-on" : ""}`}
+        className={`account-icon is-label${accountOpen ? " is-on" : ""}`}
         title={user.email}
         aria-label={accountOpen ? "Close account" : "Account"}
         aria-expanded={accountOpen}
@@ -50,6 +51,7 @@ export function AccountControl() {
         onClick={() => router.push(accountHref(searchParams, accountOpen))}
       >
         <AccountIcon />
+        Account
       </button>
     );
   }
@@ -57,7 +59,7 @@ export function AccountControl() {
   return (
     <Link
       href={authHref("login", signInNext)}
-      className={`app-nav-tab app-nav-tab-accent${accountOpen ? " is-on" : ""}`}
+      className={`app-nav-tab${accountOpen ? " is-on" : ""}`}
     >
       Sign in
     </Link>
@@ -84,15 +86,9 @@ function AccountIcon() {
 }
 
 export default function AppNav() {
-  const pathname = usePathname();
-  const onJournal = pathname === "/";
-
   return (
     <nav className="app-nav" aria-label="App">
       <div className="app-nav-tabs">
-        <Link href="/" className={`app-nav-tab${onJournal ? " is-on" : ""}`}>
-          Journal
-        </Link>
         <ApiWarmup />
       </div>
     </nav>

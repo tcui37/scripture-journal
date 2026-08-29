@@ -9,6 +9,7 @@ import {
   paragraphHtml,
   poetryPadding,
   singleTextGeometry,
+  verseHtml,
 } from "./render";
 import type { Paragraph, Settings } from "./types";
 
@@ -254,5 +255,16 @@ describe("copyright notice", () => {
     assert.match(html, /Used by permission\. All rights reserved\./);
     assert.match(html, /overflow-wrap:anywhere/);
     assert.doesNotMatch(html, /max-height:\d+px;overflow:hidden/);
+  });
+});
+
+describe("words of Christ", () => {
+  it("marks spoken words with colour and underline, not colour alone", () => {
+    const html = verseHtml(
+      { number: "16", segments: [{ text: "For God so loved", wj: true, italic: false }] },
+      settings({ wordsOfChrist: true }),
+    );
+    assert.match(html, /color:#/);
+    assert.match(html, /text-decoration:underline/);
   });
 });

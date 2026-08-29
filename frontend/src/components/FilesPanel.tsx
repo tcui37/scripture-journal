@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import GuestPrompt from "@/components/GuestPrompt";
+import PanelSkeleton from "@/components/PanelSkeleton";
 import TrashButton from "@/components/TrashButton";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -11,6 +12,7 @@ import {
   deleteFile,
   fileCreateBody,
   formatPassageLabel,
+  friendlyAccountError,
   listFiles,
   newestFirst,
 } from "@/lib/account";
@@ -46,6 +48,7 @@ export default function FilesPanel() {
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<ReturnType<typeof readJournalSnapshot>>(null);
+  const [listLoading, setListLoading] = useState(false);
 
   useEffect(() => {
     setSnapshot(readJournalSnapshot());
@@ -54,10 +57,12 @@ export default function FilesPanel() {
   useEffect(() => {
     if (!user) {
       setFiles([]);
+      setListLoading(false);
       return;
     }
 
     let cancelled = false;
+    setListLoading(true);
     listFiles()
       .then((rows) => {
         if (!cancelled) {
@@ -69,8 +74,11 @@ export default function FilesPanel() {
       .catch((error: unknown) => {
         if (!cancelled) {
           setFailed(true);
-          setStatus(error instanceof Error ? error.message : "Could not load files");
+          setStatus(friendlyAccountError(error, "files"));
         }
+      })
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
       });
 
     return () => {
@@ -109,7 +117,7 @@ export default function FilesPanel() {
       setFiles((prev) => newestFirst([saved, ...prev.filter((row) => row.id !== saved.id)]));
       setName("");
       setSnapshot(current);
-      notice("Saved.");
+      notice("Saved. Find it in the library below.");
     } catch (error) {
       notice(error instanceof Error ? error.message : "Could not save file", true);
     } finally {
@@ -120,7 +128,7 @@ export default function FilesPanel() {
   const handleDelete = async (id: string) => {
     if (pendingDelete !== id) {
       setPendingDelete(id);
-      notice("Press the trash icon again to confirm.");
+      notice("Press Confirm to remove this file.");
       return;
     }
     setBusy(true);
@@ -128,7 +136,7 @@ export default function FilesPanel() {
       await deleteFile(id);
       setFiles((prev) => prev.filter((row) => row.id !== id));
       setPendingDelete(null);
-      notice("Removed.");
+      notice("Removed from your library.");
     } catch (error) {
       notice(error instanceof Error ? error.message : "Could not delete file", true);
     } finally {
@@ -136,8 +144,8 @@ export default function FilesPanel() {
     }
   };
 
-  if (loading) {
-    return <p className="panel-note">Loading…</p>;
+  if (loading || listLoading) {
+    return <PanelSkeleton label="Loading files…" />;
   }
 
   if (!user) {
@@ -152,10 +160,7 @@ export default function FilesPanel() {
   return (
     <>
       <section className="library-block">
-        <h2 className="library-block-title">
-          <span className="section-index">01</span>
-          Save
-        </h2>
+        <h2 className="library-block-title">Save</h2>
         <div className="library-block-body">
           {preview ? (
             <p className="panel-note">
@@ -195,10 +200,7 @@ export default function FilesPanel() {
       </section>
 
       <section className="library-block">
-        <h2 className="library-block-title">
-          <span className="section-index">02</span>
-          Library
-        </h2>
+        <h2 className="library-block-title">Library</h2>
         <div className="library-block-body">
           {files.length ? (
             <ul className="record-list">
@@ -216,7 +218,13 @@ export default function FilesPanel() {
                     <button
                       type="button"
                       className="link-button"
-                      onClick={() => router.push(`/?file=${encodeURIComponent(file.id)}`)}
+                      onClick={() => {
+                        const ok = window.confirm(
+                          `Open “${file.name}”? This replaces the passage and layout on screen.`,
+                        );
+                        if (!ok) return;
+                        router.push(`/?file=${encodeURIComponent(file.id)}`);
+                      }}
                     >
                       Open
                     </button>
@@ -232,13 +240,17 @@ export default function FilesPanel() {
             </ul>
           ) : (
             <p className="panel-note">
-              No files yet. Name the journal above and save it to find it here.
+              No files yet. Name the journal above, then Save — it will show up here.
             </p>
           )}
         </div>
       </section>
 
-      {status ? <div className={failed ? "warning" : "summary"}>{status}</div> : null}
+      {status ? (
+        <div className={failed ? "warning" : "summary"} role={failed ? "alert" : "status"}>
+          {status}
+        </div>
+      ) : null}
     </>
   );
 }

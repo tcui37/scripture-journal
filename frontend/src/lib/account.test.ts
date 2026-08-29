@@ -3,12 +3,14 @@ import { afterEach, describe, it } from "node:test";
 
 import {
   AccountError,
+  authErrorField,
   authHref,
   changePassword,
   createDesign,
   fetchMe,
   fileCreateBody,
   formatPassageLabel,
+  friendlyAccountError,
   newestFirst,
   nextLabel,
   safeNext,
@@ -213,5 +215,49 @@ describe("sendJson", () => {
       calls[0]?.init?.body,
       JSON.stringify({ current_password: "old-secret", new_password: "new-secret" }),
     );
+  });
+});
+
+describe("friendlyAccountError", () => {
+  it("names a wrong password and what to do next", () => {
+    assert.equal(
+      friendlyAccountError(new AccountError(401, "Invalid email or password."), "signin"),
+      "That email or password is not right. Try again.",
+    );
+  });
+
+  it("names unavailable account storage", () => {
+    assert.equal(
+      friendlyAccountError(new AccountError(503, "Not configured"), "signup"),
+      "Account storage is not available right now. Try again in a moment.",
+    );
+  });
+
+  it("keeps a specific 400 from the API", () => {
+    assert.equal(
+      friendlyAccountError(new AccountError(400, "Enter a valid email address."), "signup"),
+      "Enter a valid email address.",
+    );
+  });
+
+  it("asks to retry when the server is down", () => {
+    assert.equal(
+      friendlyAccountError(new AccountError(502, "HTTP 502"), "signin"),
+      "Could not sign in. Check your connection and try again.",
+    );
+  });
+});
+
+describe("authErrorField", () => {
+  it("puts a wrong-password error on the password field", () => {
+    assert.equal(authErrorField(new AccountError(401, "Invalid"), "signin"), "password");
+  });
+
+  it("puts a signup 400 on the email field", () => {
+    assert.equal(authErrorField(new AccountError(400, "Enter a valid email address."), "signup"), "email");
+  });
+
+  it("keeps storage-down errors on the form", () => {
+    assert.equal(authErrorField(new AccountError(503, "Not configured"), "signin"), "form");
   });
 });

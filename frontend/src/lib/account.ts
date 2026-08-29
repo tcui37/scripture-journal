@@ -36,6 +36,50 @@ function detailMessage(detail: unknown, status: number): string {
   return `HTTP ${status}`;
 }
 
+export type AccountErrorKind = "signin" | "signup" | "password" | "files" | "designs";
+
+/** Map API/network failures to what happened and what to do next. */
+export function friendlyAccountError(error: unknown, kind: AccountErrorKind): string {
+  const status = error instanceof AccountError ? error.status : 0;
+  const message = error instanceof Error ? error.message.trim() : "";
+  const userFacing = message && !message.startsWith("HTTP ") ? message : "";
+
+  if (status === 401) {
+    if (kind === "signin") return "That email or password is not right. Try again.";
+    if (kind === "password") return "That current password is not right. Try again.";
+  }
+  if (status === 503) {
+    return "Account storage is not available right now. Try again in a moment.";
+  }
+  if (status === 429) {
+    return userFacing || "Too many attempts. Try again in a few minutes.";
+  }
+  if (status >= 500 || status === 0) {
+    if (kind === "signin") return "Could not sign in. Check your connection and try again.";
+    if (kind === "signup") return "Could not create the account. Check your connection and try again.";
+    if (kind === "password") return "Could not update the password. Try again.";
+    if (kind === "files") return "Could not load files. Try again.";
+    return "Could not load designs. Try again.";
+  }
+  if (userFacing) return userFacing;
+  if (kind === "signin") return "Could not sign in. Try again.";
+  if (kind === "signup") return "Could not create the account. Try again.";
+  if (kind === "password") return "Could not update the password. Try again.";
+  if (kind === "files") return "Could not load files. Try again.";
+  return "Could not load designs. Try again.";
+}
+
+export type AuthErrorField = "email" | "password" | "form";
+
+/** Where to attach a mapped auth error so it is not only a form-level banner. */
+export function authErrorField(error: unknown, kind: AccountErrorKind): AuthErrorField {
+  if (!(error instanceof AccountError)) return "form";
+  if (kind === "signin" && error.status === 401) return "password";
+  if (kind === "password" && error.status === 401) return "password";
+  if (kind === "signup" && error.status === 400) return "email";
+  return "form";
+}
+
 async function sendJson<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const headers: HeadersInit = {};
   if (init?.body !== undefined) headers["Content-Type"] = "application/json";

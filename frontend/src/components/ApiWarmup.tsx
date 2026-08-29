@@ -11,7 +11,7 @@ export default function ApiWarmup() {
   if (apiStatus === "error") {
     return (
       <button type="button" className="api-warmup is-error" onClick={retryWarmup}>
-        <span className="api-warmup-text">Server didn’t start — retry</span>
+        <span className="api-warmup-text">Server didn’t start — the API is waking up. Retry</span>
       </button>
     );
   }
@@ -19,7 +19,7 @@ export default function ApiWarmup() {
   return (
     <span className="api-warmup" role="status">
       <span className="api-warmup-spinner" aria-hidden="true" />
-      <span className="api-warmup-text">Starting server…</span>
+      <span className="api-warmup-text">Getting the journal ready…</span>
     </span>
   );
 }

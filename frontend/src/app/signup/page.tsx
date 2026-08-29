@@ -6,7 +6,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 
 import ApiWarmup from "@/components/ApiWarmup";
 import { useAuth } from "@/components/AuthProvider";
-import { authHref, nextLabel, safeNext, signUp } from "@/lib/account";
+import { authHref, authErrorField, friendlyAccountError, nextLabel, safeNext, signUp } from "@/lib/account";
 
 function SignupForm() {
   const router = useRouter();
@@ -16,6 +16,7 @@ function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [errorField, setErrorField] = useState<"email" | "password" | "form">("form");
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
 
@@ -27,6 +28,7 @@ function SignupForm() {
     event.preventDefault();
     if (apiStatus !== "ok") return;
     setError("");
+    setErrorField("form");
     setBusy(true);
     try {
       const result = await signUp(email.trim(), password);
@@ -37,7 +39,8 @@ function SignupForm() {
       await refresh();
       router.push(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create account");
+      setError(friendlyAccountError(err, "signup"));
+      setErrorField(authErrorField(err, "signup"));
     } finally {
       setBusy(false);
     }
@@ -45,7 +48,7 @@ function SignupForm() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <main className="auth-card">
         {checkEmail ? (
           <>
             <p className="auth-eyebrow">Almost there</p>
@@ -75,7 +78,11 @@ function SignupForm() {
               Keep named designs and journal files on your account. The journal still works without
               one.
             </p>
-            <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
+            <form
+              className="auth-form"
+              onSubmit={(event) => void handleSubmit(event)}
+              aria-describedby={error && errorField === "form" ? "signup-error" : undefined}
+            >
               <label className="control">
                 <span className="control-label">Email</span>
                 <input
@@ -83,6 +90,9 @@ function SignupForm() {
                   autoComplete="email"
                   required
                   value={email}
+                  aria-invalid={errorField === "email" || undefined}
+                  aria-describedby={error && errorField === "email" ? "signup-error" : undefined}
+                  className={errorField === "email" ? "is-invalid" : undefined}
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </label>
@@ -99,7 +109,11 @@ function SignupForm() {
                   onChange={(event) => setPassword(event.target.value)}
                 />
               </label>
-              {error ? <div className="warning">{error}</div> : null}
+              {error ? (
+                <div id="signup-error" className="warning" role="alert">
+                  {error}
+                </div>
+              ) : null}
               <button type="submit" className="action-button" disabled={busy || apiStatus !== "ok"}>
                 {busy ? "Creating…" : "Create account"}
               </button>
@@ -114,7 +128,7 @@ function SignupForm() {
             </div>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

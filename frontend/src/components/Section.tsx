@@ -1,8 +1,6 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 interface SectionProps {
-  /** Step number shown before the title, e.g. "01". */
-  index: string;
   title: string;
   open: boolean;
   onToggle: (open: boolean) => void;
@@ -10,20 +8,23 @@ interface SectionProps {
 }
 
 /**
- * A collapsible sidebar group. Built on <details> so it keeps native keyboard
- * and screen-reader behaviour; `open` is mirrored into state only so the
- * choice can be remembered between visits.
+ * A collapsible sidebar group with animated open/close. Uses a button +
+ * CSS grid accordion so height transitions smoothly; `open` is controlled by
+ * the parent so the choice can be remembered between visits.
  */
-export default function Section({ index, title, open, onToggle, children }: SectionProps) {
+export default function Section({ title, open, onToggle, children }: SectionProps) {
+  const panelId = useId();
+
   return (
-    <details
-      className="section"
-      open={open}
-      onToggle={(event) => onToggle(event.currentTarget.open)}
-    >
-      <summary className="section-title">
-        <span className="section-index">{index}</span>
-        <span className="section-name">{title}</span>
+    <div className={`section${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="section-title"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => onToggle(!open)}
+      >
+        <h2 className="section-name">{title}</h2>
         <svg
           className="chevron"
           width="12"
@@ -38,8 +39,17 @@ export default function Section({ index, title, open, onToggle, children }: Sect
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </summary>
-      <div className="section-body">{children}</div>
-    </details>
+      </button>
+      <div
+        id={panelId}
+        className="section-panel"
+        aria-hidden={!open}
+        {...(!open ? { inert: true } : {})}
+      >
+        <div className="section-panel-inner">
+          <div className="section-body">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }

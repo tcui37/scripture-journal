@@ -16,7 +16,7 @@ export default function TrashButton({
   return (
     <button
       type="button"
-      className={`icon-button${confirming ? " is-danger" : ""}`}
+      className={`icon-button${confirming ? " is-danger is-label" : ""}`}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
@@ -38,6 +38,7 @@ export default function TrashButton({
         <line x1="10" y1="11" x2="10" y2="17" />
         <line x1="14" y1="11" x2="14" y2="17" />
       </svg>
+      {confirming ? <span>Confirm</span> : null}
     </button>
   );
 }

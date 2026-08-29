@@ -15,6 +15,10 @@ interface ComboboxProps {
   onChange: (id: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** When false, the list opens on focus/click but cannot be typed into. */
+  searchable?: boolean;
+  /** Extra class on the wrapper, e.g. compact top-bar sizing. */
+  className?: string;
 }
 
 /** Longest list we will put in the DOM at once; the rest needs a narrower query. */
@@ -39,6 +43,8 @@ export default function Combobox({
   onChange,
   disabled = false,
   placeholder = "Search…",
+  searchable = true,
+  className,
 }: ComboboxProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -54,6 +60,7 @@ export default function Combobox({
   // Matching on the id as well as the label is what lets "niv" and "lsv" find
   // their translation — the short form is the part people remember.
   const filtered = useMemo(() => {
+    if (!searchable) return options;
     const needle = query.trim().toLowerCase();
     if (!needle) return options;
     return options.filter(
@@ -61,7 +68,7 @@ export default function Combobox({
         option.label.toLowerCase().includes(needle) ||
         option.id.toLowerCase().includes(needle),
     );
-  }, [options, query]);
+  }, [options, query, searchable]);
 
   const matches = useMemo(() => filtered.slice(0, MAX_VISIBLE), [filtered]);
   const hidden = filtered.length - matches.length;
@@ -107,6 +114,22 @@ export default function Combobox({
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    // After Escape the field can stay focused while closed, still showing the
+    // selected label — treat the next printable key as a fresh filter query.
+    if (
+      searchable &&
+      !open &&
+      event.key.length === 1 &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      setQuery(event.key);
+      setOpen(true);
+      return;
+    }
+
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!open) {
@@ -129,6 +152,18 @@ export default function Combobox({
       return;
     }
 
+    if (event.key === "Home" && open && matches.length) {
+      event.preventDefault();
+      setActive(0);
+      return;
+    }
+
+    if (event.key === "End" && open && matches.length) {
+      event.preventDefault();
+      setActive(matches.length - 1);
+      return;
+    }
+
     if (event.key === "Escape") {
       if (open) {
         event.preventDefault();
@@ -140,29 +175,41 @@ export default function Combobox({
     if (event.key === "Tab" && open) close();
   }
 
+  const displayValue = open && searchable ? query : (selected?.label ?? "");
+  const inputPlaceholder =
+    searchable && selected ? placeholder : searchable ? (placeholder ?? "") : undefined;
+
   return (
-    <div className="combobox" ref={wrapperRef}>
+    <div className={`combobox${className ? ` ${className}` : ""}`} ref={wrapperRef}>
       <input
         ref={inputRef}
         type="text"
         role="combobox"
         aria-label={label}
         aria-expanded={open}
+        aria-haspopup="listbox"
         aria-controls={listId}
-        aria-autocomplete="list"
+        aria-autocomplete={searchable ? "list" : "none"}
         aria-activedescendant={
           open && matches[active] ? `${listId}-${active}` : undefined
         }
         autoComplete="off"
         spellCheck={false}
+        readOnly={!searchable}
         disabled={disabled}
         className="combobox-input"
-        // Closed, this reads as the current choice; open, it is the query box.
-        value={open ? query : (selected?.label ?? "")}
-        placeholder={selected ? placeholder : (placeholder ?? "")}
+        // Closed, this reads as the current choice; open + searchable, it is the query box.
+        value={displayValue}
+        placeholder={inputPlaceholder}
         onChange={(event) => {
+          if (!searchable) return;
+          // Printable keys while closed are handled in onKeyDown; paste still lands here.
+          if (!open) {
+            setQuery(event.target.value);
+            setOpen(true);
+            return;
+          }
           setQuery(event.target.value);
-          if (!open) setOpen(true);
         }}
         onFocus={() => setOpen(true)}
         onClick={() => setOpen(true)}
@@ -207,12 +254,14 @@ export default function Combobox({
             </li>
           ))}
 
-          {!matches.length ? (
-            <li className="combobox-empty">No match for “{query.trim()}”</li>
+          {searchable && !matches.length ? (
+            <li className="combobox-empty" role="presentation">
+              No match for “{query.trim()}”
+            </li>
           ) : null}
 
           {hidden > 0 ? (
-            <li className="combobox-empty">
+            <li className="combobox-empty" role="presentation">
               {hidden} more — keep typing to narrow
             </li>
           ) : null}

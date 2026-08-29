@@ -235,6 +235,6 @@ export const ZOOM_OPTIONS = [
 export const TEXT_TOGGLES = [
   { id: "showHeadings", label: "Section headings" },
   { id: "showChapterNumbers", label: "Chapter numbers" },
-  { id: "wordsOfChrist", label: "Words of Christ in red" },
+  { id: "wordsOfChrist", label: "Words of Christ, marked in red" },
   { id: "justify", label: "Justified text" },
 ] as const satisfies readonly { id: keyof Settings; label: string }[];

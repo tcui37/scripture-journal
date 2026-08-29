@@ -117,6 +117,23 @@ export default function Sidebar({
     { id: "", label: "None — single translation" },
     ...comparable.map((bible) => ({ id: bible.id, label: withLanguage(bible) })),
   ];
+  const bookOptions = books.map((entry) => ({ id: entry.id, label: entry.name }));
+  const chapterOptions = chapters.map((chapter) => ({
+    id: String(chapter.number),
+    label: `Chapter ${chapter.number}`,
+  }));
+  const startVerseOptions = startVerses.map((number) => ({
+    id: String(number),
+    label: `Verse ${number}`,
+  }));
+  const endVerseOptions = endVerses.map((number) => ({
+    id: String(number),
+    label: `Verse ${number}`,
+  }));
+  const paperSizeOptions = PAGE_SIZE_OPTIONS.map((option) => ({
+    id: option.id,
+    label: option.label,
+  }));
 
   return (
     <aside
@@ -127,14 +144,14 @@ export default function Sidebar({
     >
       <div className="rail-header">
         <div className="rail-heading">
-          <h1 className="rail-title">
+          <p className="rail-title">
             Scripture
             <br />
             Journal
-          </h1>
+          </p>
           <button
             type="button"
-            className="rail-toggle"
+            className="rail-toggle is-label"
             aria-expanded={!collapsed}
             aria-controls="settings-rail"
             aria-label="Hide settings"
@@ -153,6 +170,7 @@ export default function Sidebar({
             >
               <polyline points="15 18 9 12 15 6" />
             </svg>
+            Hide
           </button>
         </div>
         <div className="rail-tagline">A passage, a wide margin, room to write.</div>
@@ -165,7 +183,7 @@ export default function Sidebar({
               className={`opt${railView === "design" ? " is-on" : ""}`}
               onClick={() => onRailViewChange("design")}
             >
-              Design
+              Settings
             </button>
             <button
               type="button"
@@ -186,9 +204,8 @@ export default function Sidebar({
         ) : (
           <>
         <Section
-          index="01"
           title="Passage"
-          open={openSections.passage ?? true}
+          open={openSections.passage ?? false}
           onToggle={(open) => onToggleSection("passage", open)}
         >
           <div className="control">
@@ -196,6 +213,15 @@ export default function Sidebar({
               Languages
               <span className="control-value">{selectedLanguages.length || ""}</span>
             </div>
+            {languageOptions.length ? (
+              <Combobox
+                label="Add a language"
+                options={languageOptions}
+                value=""
+                onChange={addLanguage}
+                placeholder="Add a language…"
+              />
+            ) : null}
             <div className="chip-row">
               {selectedLanguageChips.map((chip) => (
                 <span key={chip.code} className="chip">
@@ -213,15 +239,6 @@ export default function Sidebar({
                 </span>
               ))}
             </div>
-            {languageOptions.length ? (
-              <Combobox
-                label="Add a language"
-                options={languageOptions}
-                value=""
-                onChange={addLanguage}
-                placeholder="Add a language…"
-              />
-            ) : null}
           </div>
 
           <div className="control">
@@ -241,126 +258,112 @@ export default function Sidebar({
             />
           </div>
 
-          <div className="control">
-            <div className="control-label">
-              Compare with
-              {comparing ? <span className="control-value">{sides.compare}</span> : null}
+          <details className="advanced" open={comparing || undefined}>
+            <summary>Second translation</summary>
+            <div className="advanced-body">
+              <div className="control">
+                <div className="control-label">
+                  Compare with
+                  {comparing ? <span className="control-value">{sides.compare}</span> : null}
+                </div>
+                <Combobox
+                  label="Compare with a second translation"
+                  options={compareOptions}
+                  value={reference.compareId}
+                  onChange={(compareId) => {
+                    setReference({ compareId });
+                    if (!compareId && settings.parallelSwap) {
+                      onSettingsChange({ parallelSwap: false });
+                    }
+                  }}
+                  disabled={!comparable.length}
+                  placeholder="Search translations…"
+                />
+              </div>
+
+              {comparing ? (
+                <button
+                  type="button"
+                  className={`swap-button${settings.parallelSwap ? " is-on" : ""}`}
+                  onClick={() => onSettingsChange({ parallelSwap: !settings.parallelSwap })}
+                  aria-pressed={settings.parallelSwap}
+                  aria-label="Swap translation sides"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="16 3 21 7 16 11" />
+                    <line x1="21" y1="7" x2="3" y2="7" />
+                    <polyline points="8 21 3 17 8 13" />
+                    <line x1="3" y1="17" x2="21" y2="17" />
+                  </svg>
+                  Swap sides
+                </button>
+              ) : null}
             </div>
+          </details>
+
+          <div className="control">
+            <div className="control-label">Book</div>
             <Combobox
-              label="Compare with a second translation"
-              options={compareOptions}
-              value={reference.compareId}
-              onChange={(compareId) => {
-                setReference({ compareId });
-                if (!compareId && settings.parallelSwap) {
-                  onSettingsChange({ parallelSwap: false });
-                }
-              }}
-              disabled={!comparable.length}
-              placeholder="Search translations…"
+              label="Book"
+              options={bookOptions}
+              value={reference.bookId}
+              onChange={(bookId) => setReference({ bookId })}
+              disabled={!books.length}
+              placeholder="Search books…"
             />
           </div>
-
-          {comparing ? (
-            <button
-              type="button"
-              className={`swap-button${settings.parallelSwap ? " is-on" : ""}`}
-              onClick={() => onSettingsChange({ parallelSwap: !settings.parallelSwap })}
-              aria-pressed={settings.parallelSwap}
-              aria-label="Swap translation sides"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="16 3 21 7 16 11" />
-                <line x1="21" y1="7" x2="3" y2="7" />
-                <polyline points="8 21 3 17 8 13" />
-                <line x1="3" y1="17" x2="21" y2="17" />
-              </svg>
-              Swap sides
-            </button>
-          ) : null}
-
-          <label className="control">
-            <span className="control-label">Book</span>
-            <select
-              value={reference.bookId}
-              onChange={(event) => setReference({ bookId: event.target.value })}
-              disabled={!books.length}
-            >
-              {books.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <div className="control">
             <div className="control-label">Starts at</div>
             <div className="grid-2">
-              <select
-                aria-label="Start chapter"
+              <Combobox
+                label="Start chapter"
+                options={chapterOptions}
                 value={reference.startChapter}
-                onChange={(event) => setReference({ startChapter: event.target.value })}
+                onChange={(startChapter) => setReference({ startChapter })}
                 disabled={!chapters.length}
-              >
-                {chapters.map((chapter) => (
-                  <option key={chapter.number} value={chapter.number}>
-                    Chapter {chapter.number}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Start verse"
+                placeholder="Search chapters…"
+              />
+              <Combobox
+                label="Start verse"
+                options={startVerseOptions}
                 value={reference.startVerse}
-                onChange={(event) => setReference({ startVerse: event.target.value })}
+                onChange={(startVerse) => setReference({ startVerse })}
                 disabled={!startVerses.length}
-              >
-                {startVerses.map((number) => (
-                  <option key={number} value={number}>
-                    Verse {number}
-                  </option>
-                ))}
-              </select>
+                placeholder="Search verses…"
+              />
             </div>
           </div>
 
           <div className="control">
             <div className="control-label">Ends at</div>
             <div className="grid-2">
-              <select
-                aria-label="End chapter"
+              <Combobox
+                label="End chapter"
+                options={chapterOptions}
                 value={reference.endChapter}
-                onChange={(event) => setReference({ endChapter: event.target.value })}
+                onChange={(endChapter) => setReference({ endChapter })}
                 disabled={!chapters.length}
-              >
-                {chapters.map((chapter) => (
-                  <option key={chapter.number} value={chapter.number}>
-                    Chapter {chapter.number}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="End verse"
+                placeholder="Search chapters…"
+              />
+              <Combobox
+                label="End verse"
+                options={endVerseOptions}
                 value={reference.endVerse}
-                onChange={(event) => setReference({ endVerse: event.target.value })}
+                onChange={(endVerse) => setReference({ endVerse })}
                 disabled={!endVerses.length}
-              >
-                {endVerses.map((number) => (
-                  <option key={number} value={number}>
-                    Verse {number}
-                  </option>
-                ))}
-              </select>
+                placeholder="Search verses…"
+              />
             </div>
           </div>
 
@@ -383,9 +386,8 @@ export default function Sidebar({
         </Section>
 
         <Section
-          index="02"
           title="Page layout"
-          open={openSections.layout ?? true}
+          open={openSections.layout ?? false}
           onToggle={(open) => onToggleSection("layout", open)}
         >
           {reference.compareId ? (
@@ -399,23 +401,16 @@ export default function Sidebar({
             />
           ) : null}
 
-          <label className="control">
-            <span className="control-label">Paper size</span>
-            <select
+          <div className="control">
+            <div className="control-label">Paper size</div>
+            <Combobox
+              label="Paper size"
+              options={paperSizeOptions}
               value={settings.pageSize}
-              onChange={(event) => onSettingsChange({ pageSize: event.target.value as PageSize })}
-            >
-              {[...new Set(PAGE_SIZE_OPTIONS.map((option) => option.group))].map((group) => (
-                <optgroup key={group} label={group}>
-                  {PAGE_SIZE_OPTIONS.filter((option) => option.group === group).map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
+              onChange={(pageSize) => onSettingsChange({ pageSize: pageSize as PageSize })}
+              placeholder="Search paper sizes…"
+            />
+          </div>
           <OptionGroup
             title="Orientation"
             options={ORIENTATION_OPTIONS}
@@ -501,9 +496,8 @@ export default function Sidebar({
         </Section>
 
         <Section
-          index="03"
           title="Typography"
-          open={openSections.typography ?? true}
+          open={openSections.typography ?? false}
           onToggle={(open) => onToggleSection("typography", open)}
         >
           <OptionGroup
@@ -543,9 +537,8 @@ export default function Sidebar({
         </Section>
 
         <Section
-          index="04"
           title="Scripture text"
-          open={openSections.text ?? true}
+          open={openSections.text ?? false}
           onToggle={(open) => onToggleSection("text", open)}
         >
           <OptionGroup
@@ -560,13 +553,18 @@ export default function Sidebar({
             value={settings.flow}
             onChange={(flow) => onSettingsChange({ flow })}
           />
-          <OptionGroup
-            title="Poetry indent"
-            options={POETRY_INDENT_OPTIONS}
-            value={settings.poetryIndent}
-            onChange={(poetryIndent) => onSettingsChange({ poetryIndent })}
-            variant="grid-3"
-          />
+          <details className="advanced" open={settings.poetryIndent !== "regular" || undefined}>
+            <summary>Poetry indent</summary>
+            <div className="advanced-body">
+              <OptionGroup
+                title="Poetry indent"
+                options={POETRY_INDENT_OPTIONS}
+                value={settings.poetryIndent}
+                onChange={(poetryIndent) => onSettingsChange({ poetryIndent })}
+                variant="grid-3"
+              />
+            </div>
+          </details>
           <ToggleList
             title="Show"
             toggles={TEXT_TOGGLES}
@@ -577,14 +575,11 @@ export default function Sidebar({
 
         {user ? (
         <Section
-          index="05"
           title="Designs"
           open={openSections.designs ?? false}
           onToggle={(open) => onToggleSection("designs", open)}
         >
-          <div id="rail-designs">
-            <DesignsPanel user={user} settings={settings} onSettingsChange={onSettingsChange} />
-          </div>
+          <DesignsPanel user={user} settings={settings} onSettingsChange={onSettingsChange} />
         </Section>
         ) : null}
           </>

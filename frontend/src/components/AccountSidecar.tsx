@@ -1,20 +1,56 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import AccountPanel from "./AccountPanel";
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
 interface AccountSidecarProps {
   onClose: () => void;
 }
 
 export default function AccountSidecar({ onClose }: AccountSidecarProps) {
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
+    const panel = panelRef.current;
+    const previously = document.activeElement as HTMLElement | null;
+
+    const items = () =>
+      Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
+
+    closeRef.current?.focus();
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const list = items();
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (previously && document.contains(previously)) previously.focus();
+    };
   }, [onClose]);
 
   return (
@@ -25,11 +61,21 @@ export default function AccountSidecar({ onClose }: AccountSidecarProps) {
         aria-label="Close account"
         onClick={onClose}
       />
-      <aside id="account-sidecar" className="sidecar" aria-label="Account">
+      <aside
+        ref={panelRef}
+        id="account-sidecar"
+        className="sidecar"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="account-sidecar-title"
+      >
         <div className="sidecar-header">
           <div className="sidecar-heading">
-            <h2 className="sidecar-title">Account</h2>
+            <h2 id="account-sidecar-title" className="sidecar-title">
+              Account
+            </h2>
             <button
+              ref={closeRef}
               type="button"
               className="rail-toggle"
               aria-controls="account-sidecar"
