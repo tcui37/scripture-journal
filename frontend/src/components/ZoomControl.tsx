@@ -153,7 +153,6 @@ export default function ZoomControl({ fit, scale, onFitChange, onScaleChange }: 
             type="range"
             id={sliderId}
             className="zoom-slider"
-            orient="vertical"
             min={ZOOM_MIN}
             max={ZOOM_MAX}
             step={ZOOM_SLIDER_STEP}
