@@ -2,10 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
-import AccountPanel from "./AccountPanel";
+import { FOCUSABLE, restoreFocusFromPanel } from "@/lib/focus";
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+import AccountPanel from "./AccountPanel";
 
 interface AccountSidecarProps {
   open: boolean;
@@ -54,7 +53,14 @@ export default function AccountSidecar({ open, onClose }: AccountSidecarProps) {
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      if (previously && document.contains(previously)) previously.focus();
+      const panel = panelRef.current;
+      if (
+        !restoreFocusFromPanel(panel, [".account-icon.is-label", ".app-nav-tab", "#journal-main"]) &&
+        previously &&
+        document.contains(previously)
+      ) {
+        previously.focus();
+      }
     };
   }, [open]);
 

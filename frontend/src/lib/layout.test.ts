@@ -9,8 +9,10 @@ import {
   TOPBAR_STACK_MAX_PX,
   fitPreviewScale,
   isNarrowWidth,
+  maxStageScrollLeft,
   narrowUiQuery,
   previewGutter,
+  railCollapsedAfterViewportChange,
   readPreviewPaddingInline,
   startRailCollapsed,
 } from "./layout";
@@ -86,6 +88,34 @@ describe("startRailCollapsed", () => {
     assert.equal(startRailCollapsed(false, false, true), true);
     assert.equal(startRailCollapsed(false, false, false), false);
     assert.equal(startRailCollapsed(false, false), false);
+  });
+});
+
+describe("railCollapsedAfterViewportChange", () => {
+  it("closes the rail on a phone unless Files is open", () => {
+    assert.equal(railCollapsedAfterViewportChange(true, false, false, false), true);
+    assert.equal(railCollapsedAfterViewportChange(true, true, true, true), false);
+  });
+
+  it("preserves an open rail when widening", () => {
+    assert.equal(railCollapsedAfterViewportChange(false, false, false, true), false);
+  });
+
+  it("restores stored desktop collapse when widening from a closed rail", () => {
+    assert.equal(railCollapsedAfterViewportChange(false, false, true, true), true);
+    assert.equal(railCollapsedAfterViewportChange(false, false, true, false), false);
+    assert.equal(railCollapsedAfterViewportChange(false, false, true), false);
+  });
+});
+
+describe("maxStageScrollLeft", () => {
+  it("returns zero when content fits", () => {
+    assert.equal(maxStageScrollLeft(400, 400), 0);
+    assert.equal(maxStageScrollLeft(300, 400), 0);
+  });
+
+  it("returns the overflow width when content is wider", () => {
+    assert.equal(maxStageScrollLeft(1000, 400), 600);
   });
 });
 

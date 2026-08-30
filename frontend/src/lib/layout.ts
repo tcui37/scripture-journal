@@ -61,6 +61,26 @@ export function startRailCollapsed(
   return false;
 }
 
+/**
+ * After a viewport change, pick rail collapse state.
+ * Widening preserves an open rail; narrowing uses the phone drawer rules.
+ */
+export function railCollapsedAfterViewportChange(
+  narrow: boolean,
+  filesOpen: boolean,
+  currentlyCollapsed: boolean,
+  storedCollapsed?: boolean,
+): boolean {
+  if (narrow) return startRailCollapsed(true, filesOpen);
+  if (!currentlyCollapsed) return false;
+  return startRailCollapsed(false, filesOpen, storedCollapsed);
+}
+
+/** Maximum horizontal scroll offset for a scroll container. */
+export function maxStageScrollLeft(scrollWidth: number, clientWidth: number): number {
+  return Math.max(0, scrollWidth - clientWidth);
+}
+
 export function narrowUiQuery(): string {
   return `(max-width: ${NARROW_UI_MAX_PX}px)`;
 }

@@ -27,7 +27,7 @@ export function AccountControl() {
       return (
         <Link href="/?account=1" className="account-icon is-label" title={user.email} aria-label="Account">
           <AccountIcon />
-          Account
+          <span className="topbar-btn-label">Account</span>
         </Link>
       );
     }
@@ -43,7 +43,7 @@ export function AccountControl() {
         onClick={() => journalUi?.toggleAccount()}
       >
         <AccountIcon />
-        Account
+        <span className="topbar-btn-label">Account</span>
       </button>
     );
   }
@@ -78,6 +78,9 @@ function AccountIcon() {
 }
 
 export default function AppNav() {
+  const { apiStatus } = useAuth();
+  if (apiStatus === "ok") return null;
+
   return (
     <nav className="app-nav" aria-label="App">
       <div className="app-nav-tabs">

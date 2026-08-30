@@ -1412,11 +1412,12 @@ button {
   text-overflow: ellipsis;
 }
 
-.topbar-left {
+.topbar-head {
   display: flex;
   align-items: center;
   gap: 14px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .topbar-copy {
@@ -1426,18 +1427,33 @@ button {
   min-width: 0;
 }
 
-.topbar-left .rail-toggle {
+.topbar-head .rail-toggle {
   align-self: center;
   flex-shrink: 0;
 }
 
-.topbar-right {
+.topbar-actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
   margin-left: auto;
   flex: 0 1 auto;
+}
+
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.topbar-account {
+  flex: none;
+}
+
+.topbar-settings-icon--gear {
+  display: none;
 }
 
 .topbar-status {
@@ -1473,7 +1489,7 @@ button {
     line-height: 1.35;
   }
 
-  .topbar-right {
+  .topbar-actions {
     flex: 0 1 100%;
     margin-left: 0;
     justify-content: flex-start;
@@ -1557,8 +1573,8 @@ button {
   height: 108px;
   margin: 0;
   accent-color: var(--color-accent);
-  -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
+  -webkit-appearance: none;
+  appearance: none;
   writing-mode: vertical-lr;
   direction: rtl;
 }
@@ -1637,6 +1653,7 @@ button {
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -1656,6 +1673,7 @@ button {
 .preview-canvas {
   box-sizing: border-box;
   width: max-content;
+  min-width: 100%;
   margin-inline: auto;
   padding: 16px 12px 40px;
 }
@@ -1665,6 +1683,12 @@ button {
   .preview-canvas {
     padding: var(--space-8) var(--space-6) 60px;
   }
+}
+
+.pagestack-scaler {
+  flex-shrink: 0;
+  margin-inline: auto;
+  overflow: hidden;
 }
 
 .pagestack {
@@ -2003,8 +2027,22 @@ button.api-warmup:hover,
 
 /* Keep 768px in sync with NARROW_UI_MAX_PX in src/lib/layout.ts. */
 @media screen and (max-width: 768px) {
+  :root {
+    --ui-font-scale: 0.98;
+  }
+
+  html.is-mobile-overlay,
+  html.is-mobile-overlay body {
+    overflow: hidden;
+  }
+
   .app {
-    height: 100vh;
+    height: 100dvh;
+  }
+
+  html.is-mobile-overlay .desk {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .rail-backdrop {
@@ -2033,6 +2071,7 @@ button.api-warmup:hover,
   .rail:not(.is-collapsed) {
     width: 100%;
     border-right: none;
+    isolation: isolate;
   }
 
   .rail-header,
@@ -2046,19 +2085,127 @@ button.api-warmup:hover,
     top: 0;
     z-index: 1;
     background: var(--color-neutral-100);
-    padding-top: max(var(--space-4), env(safe-area-inset-top));
+    padding-top: max(var(--space-3), env(safe-area-inset-top));
     padding-left: max(var(--space-4), env(safe-area-inset-left));
     padding-right: max(var(--space-4), env(safe-area-inset-right));
+    padding-bottom: var(--space-3);
   }
 
   .rail-body {
     padding-left: max(var(--space-4), env(safe-area-inset-left));
     padding-right: max(var(--space-4), env(safe-area-inset-right));
-    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    padding-top: 0;
   }
 
   .rail-title {
-    font-size: calc(28px * var(--ui-font-scale));
+    font-size: calc(24px * var(--ui-font-scale));
+    line-height: 1.05;
+  }
+
+  .rail-tagline {
+    margin-top: var(--space-1);
+    font-size: calc(12px * var(--ui-font-scale));
+  }
+
+  .rail-mode {
+    margin-top: var(--space-3);
+    gap: 6px;
+  }
+
+  .rail-body > :not(.rail-footer) {
+    margin-bottom: var(--space-4);
+  }
+
+  .rail .section {
+    padding-block: var(--space-1);
+  }
+
+  .rail .section-title {
+    min-height: 36px;
+    padding-block: 4px;
+  }
+
+  .rail .section-body {
+    gap: var(--space-2);
+  }
+
+  .rail .section.is-open .section-body {
+    padding-top: var(--space-2);
+  }
+
+  .rail .section.is-open {
+    padding-bottom: var(--space-2);
+  }
+
+  .rail .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .rail .opt {
+    min-height: 36px;
+    padding: 7px 11px;
+    font-size: calc(12px * var(--ui-font-scale));
+  }
+
+  .rail .opt.is-tall {
+    padding: 9px 12px;
+  }
+
+  .rail .toggle,
+  .rail .btn,
+  .rail .link-button,
+  .rail .action-button,
+  .rail .swap-button,
+  .rail .advanced > summary {
+    min-height: 36px;
+  }
+
+  .rail .link-button,
+  .rail .swap-button {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .rail .quick-row {
+    gap: 8px;
+  }
+
+  .rail .quick-row .btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rail .chip {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: calc(13px * var(--ui-font-scale));
+  }
+
+  .rail .chip-remove {
+    width: 24px;
+    height: 24px;
+  }
+
+  .rail .combobox-input,
+  .rail .control input[type="text"],
+  .rail .control input[type="email"],
+  .rail .control input[type="password"] {
+    min-height: 38px;
+    padding: 8px 32px 8px 12px;
+    /* 16px prevents iOS from zooming the page on focus. */
+    font-size: 16px;
+  }
+
+  .rail .combobox-option {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: calc(13px * var(--ui-font-scale));
+  }
+
+  .rail-header .rail-toggle.is-label {
+    min-height: 36px;
+    height: auto;
   }
 
   .sidecar-backdrop {
@@ -2078,6 +2225,7 @@ button.api-warmup:hover,
 
   .sidecar.is-open {
     width: 100%;
+    isolation: isolate;
   }
 
   .sidecar-header,
@@ -2090,40 +2238,83 @@ button.api-warmup:hover,
     top: 0;
     z-index: 1;
     background: var(--color-neutral-100);
-    padding-top: max(var(--space-4), env(safe-area-inset-top));
+    padding-top: max(var(--space-3), env(safe-area-inset-top));
     padding-left: max(var(--space-4), env(safe-area-inset-left));
     padding-right: max(var(--space-4), env(safe-area-inset-right));
+    padding-bottom: var(--space-3);
   }
 
   .sidecar-body {
     padding-left: max(var(--space-4), env(safe-area-inset-left));
     padding-right: max(var(--space-4), env(safe-area-inset-right));
-    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
   }
 
   .sidecar-title {
-    font-size: calc(28px * var(--ui-font-scale));
+    font-size: calc(24px * var(--ui-font-scale));
+  }
+
+  .sidecar .control input[type="text"],
+  .sidecar .control input[type="email"],
+  .sidecar .control input[type="password"] {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 16px;
+  }
+
+  .sidecar .btn,
+  .sidecar .action-button,
+  .sidecar .link-button {
+    min-height: 36px;
   }
 
   .topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "settings copy account"
+      "tools tools tools";
+    align-items: center;
     gap: 10px 12px;
     padding: 10px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
     padding-top: max(10px, env(safe-area-inset-top));
   }
 
-  .topbar-left {
-    flex: 1 1 auto;
-    gap: 8px;
+  .topbar-head,
+  .topbar-actions {
+    display: contents;
+  }
+
+  .topbar-settings {
+    grid-area: settings;
   }
 
   .topbar-copy {
+    grid-area: copy;
+    min-width: 0;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    text-align: center;
     gap: 2px;
   }
 
+  .topbar-account {
+    grid-area: account;
+    justify-self: end;
+  }
+
+  .topbar-tools {
+    grid-area: tools;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
   .topbar-reference {
-    font-size: calc(16px * var(--ui-font-scale));
+    font-size: calc(15px * var(--ui-font-scale));
     max-width: 100%;
   }
 
@@ -2132,16 +2323,25 @@ button.api-warmup:hover,
     line-height: 1.35;
   }
 
-  .topbar-right {
-    flex: 0 1 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-    gap: var(--space-2);
+  .topbar-btn-label {
+    display: none;
+  }
+
+  .topbar-settings-icon--chevron {
+    display: none;
+  }
+
+  .topbar-settings-icon--gear {
+    display: block;
+  }
+
+  .zoom-control-label,
+  .zoom-fit-button {
+    display: none;
   }
 
   .app-nav {
     min-width: 0;
-    flex: 1;
   }
 
   .app-nav-tabs {
@@ -2149,115 +2349,88 @@ button.api-warmup:hover,
   }
 
   .app-nav-tab,
-  .rail-toggle,
-  .icon-btn,
-  .account-icon,
-  .download-button,
-  .icon-button {
-    min-width: 44px;
-    min-height: 44px;
+  .topbar .rail-toggle,
+  .topbar .account-icon,
+  .topbar .download-button,
+  .topbar .icon-button,
+  .icon-btn {
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .rail-toggle.is-label,
   .icon-btn.is-label,
-  .account-icon.is-label,
   .download-button.is-label,
   .icon-button.is-label {
     width: auto;
-    height: 44px;
-    padding: 0 14px 0 12px;
-    font-size: calc(13px * var(--ui-font-scale));
+    height: 40px;
+    padding: 0 12px 0 10px;
+    font-size: calc(12px * var(--ui-font-scale));
+  }
+
+  .rail-toggle.is-label.topbar-settings,
+  .account-icon.is-label {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
   }
 
   .app-nav-tab {
     display: inline-flex;
     align-items: center;
-    padding: 10px 14px;
+    padding: 8px 12px;
   }
 
   .download-button:not(.is-label) {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     margin-left: 0;
   }
 
   .account-icon:not(.is-label) {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 
   .combobox-input,
   .control input[type="text"],
   .control input[type="email"],
   .control input[type="password"] {
-    min-height: 44px;
-    font-size: calc(16px * var(--ui-font-scale));
+    min-height: 38px;
+    padding: 8px 32px 8px 12px;
+    font-size: 16px;
   }
 
   .combobox--compact .combobox-input {
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 
   .zoom-fit-button,
   .zoom-percent-input {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .zoom-percent-input {
-    font-size: calc(16px * var(--ui-font-scale));
-  }
-
-  .zoom-slider {
-    height: 120px;
-  }
-
-  .opt {
-    min-height: 44px;
-  }
-
-  .section-title,
-  .toggle,
-  .btn,
-  .link-button,
-  .action-button,
-  .swap-button {
-    min-height: 44px;
-  }
-
-  .link-button,
-  .swap-button {
-    display: inline-flex;
-    align-items: center;
-  }
-
-  .chip {
-    min-height: 44px;
-  }
-
-  .chip-remove {
-    width: 32px;
-    height: 32px;
-  }
-
-  .combobox-option {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    padding: 10px 12px;
     font-size: calc(14px * var(--ui-font-scale));
   }
 
-  .combobox-list {
-    max-height: min(264px, 45vh);
+  .zoom-slider {
+    height: 100px;
   }
 
-  .learn-more {
-    display: inline-flex;
+  .combobox-option {
+    min-height: 38px;
+    display: flex;
     align-items: center;
-    min-height: 44px;
-    padding: 8px 4px;
-    white-space: normal;
+    padding: 8px 12px;
+    font-size: calc(13px * var(--ui-font-scale));
+  }
+
+  .combobox-list {
+    max-height: min(240px, 42vh);
   }
 
   .api-warmup {
@@ -2294,12 +2467,12 @@ button.api-warmup:hover,
   }
 
   .auth-card {
-    padding: 28px 20px 20px;
+    padding: 24px 18px 18px;
     max-width: none;
   }
 
   .auth-heading {
-    font-size: calc(30px * var(--ui-font-scale));
+    font-size: calc(26px * var(--ui-font-scale));
   }
 
   .save-row {
@@ -2357,8 +2530,8 @@ button.api-warmup:hover,
   .account-icon,
   .download-button,
   .icon-button {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .rail-toggle.is-label,
@@ -2367,8 +2540,8 @@ button.api-warmup:hover,
   .download-button.is-label,
   .icon-button.is-label {
     width: auto;
-    height: 44px;
-    padding: 0 14px 0 12px;
+    height: 40px;
+    padding: 0 12px 0 10px;
   }
 }
 
@@ -2418,8 +2591,13 @@ button.api-warmup:hover,
     overflow: visible;
   }
 
+  .pagestack-scaler {
+    width: auto !important;
+    height: auto !important;
+  }
+
   .pagestack {
-    zoom: 1 !important;
+    transform: none !important;
     gap: 0 !important;
   }
 

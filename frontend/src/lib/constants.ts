@@ -4,6 +4,9 @@ import type { PageSize, ParallelMode, Settings } from "./types";
 export const APP_TAGLINE =
   "Design printable scripture journal pages — for export and print";
 
+/** Vertical gap between preview sheets — keep in sync with `.pagestack` in globals.css. */
+export const PAGE_STACK_GAP_PX = 30;
+
 /** Sheet sizes in CSS pixels at 96dpi, portrait. */
 export const PAGE_SIZES: Record<PageSize, { width: number; height: number }> = {
   A3: { width: 1123, height: 1587 }, // 297 × 420 mm

@@ -8,12 +8,11 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 
 import { useScripture } from "@/hooks/useScripture";
 import { AccountError, authHref, fetchFile, journalFileState } from "@/lib/account";
-import { readJournalPanelsFromSearch, syncJournalUrl } from "@/lib/journal-url";
+import { readJournalPanelsFromSearch, resolveLandingPanels, syncJournalUrl } from "@/lib/journal-url";
 import { uniqueLanguages } from "@/lib/bibles";
 import {
   clampZoom,
@@ -26,10 +25,12 @@ import {
 import {
   fitPreviewScale,
   narrowUiQuery,
+  railCollapsedAfterViewportChange,
   readPreviewPaddingInline,
   startRailCollapsed,
 } from "@/lib/layout";
 import { printFilename } from "@/lib/filename";
+import { restoreFocusFromPanel } from "@/lib/focus";
 import { checkLimits } from "@/lib/limits";
 import {
   formatPageCountLabel,
@@ -56,6 +57,13 @@ const unique = (parts: (string | undefined)[]) =>
 
 const APP_TITLE = "Scripture Journal";
 
+const SETTINGS_RAIL_ID = "settings-rail";
+const SETTINGS_FOCUS_FALLBACKS = [".topbar-settings", "#journal-main"] as const;
+
+function restoreSettingsFocus(): void {
+  restoreFocusFromPanel(document.getElementById(SETTINGS_RAIL_ID), SETTINGS_FOCUS_FALLBACKS);
+}
+
 export default function JournalApp() {
   // Settings live in localStorage, which is only readable after mount — gate
   // the data fetches on it so we don't load the defaults then immediately
@@ -63,11 +71,12 @@ export default function JournalApp() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const landingPanels = readJournalPanelsFromSearch(searchParams);
+  const resolvedLanding = resolveLandingPanels(landingPanels);
   const pendingFileIdRef = useRef(landingPanels.fileId);
   const { user, sessionReady, apiStatus } = useAuth();
   const { getCachedFile, cacheFile } = useLibrary();
-  const [filesOpen, setFilesOpen] = useState(landingPanels.files);
-  const [accountOpen, setAccountOpen] = useState(landingPanels.account);
+  const [filesOpen, setFilesOpen] = useState(resolvedLanding.files);
+  const [accountOpen, setAccountOpen] = useState(resolvedLanding.account);
   // Hide Files until the session is known so guests never flash that panel.
   const filesPanelOpen = Boolean(user) && filesOpen;
   const railView: RailView = filesPanelOpen ? "files" : "design";
@@ -76,7 +85,8 @@ export default function JournalApp() {
   const [activeLibraryFile, setActiveLibraryFile] = useState<JournalFile | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const [railCollapsed, setRailCollapsed] = useState(true);
+  // When Files is deep-linked the rail must start open — avoids a collapsed flash.
+  const [railCollapsed, setRailCollapsed] = useState(() => !resolvedLanding.files);
   const [designFocusToken, setDesignFocusToken] = useState(0);
   const [initial, setInitial] = useState<{
     reference: Reference;
@@ -96,6 +106,11 @@ export default function JournalApp() {
   const setReferenceRef = useRef(setReference);
   referenceRef.current = reference;
   setReferenceRef.current = setReference;
+
+  const railCollapsedRef = useRef(railCollapsed);
+  const accountOpenRef = useRef(accountOpen);
+  railCollapsedRef.current = railCollapsed;
+  accountOpenRef.current = accountOpen;
 
   /* ── persistence ─────────────────────────────────────────────────────── */
 
@@ -339,44 +354,56 @@ export default function JournalApp() {
     panRef.current = null;
   }, []);
 
-  const handleStagePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
-    if (event.button !== 0) return;
+  useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    panRef.current = {
-      pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      sl: stage.scrollLeft,
-      st: stage.scrollTop,
-      moved: false,
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      panRef.current = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        sl: stage.scrollLeft,
+        st: stage.scrollTop,
+        moved: false,
+      };
+      stage.setPointerCapture(event.pointerId);
     };
-    stage.setPointerCapture(event.pointerId);
-  }, []);
 
-  const handleStagePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const pan = panRef.current;
-    const stage = stageRef.current;
-    if (!pan || pan.pointerId !== event.pointerId || !stage) return;
-    const dx = event.clientX - pan.x;
-    const dy = event.clientY - pan.y;
-    if (!pan.moved && dx * dx + dy * dy < 9) return;
-    if (!pan.moved) {
-      pan.moved = true;
-      stage.classList.add("is-panning");
-    }
-    event.preventDefault();
-    stage.scrollLeft = pan.sl - dx;
-    stage.scrollTop = pan.st - dy;
-  }, []);
+    const onPointerMove = (event: PointerEvent) => {
+      const pan = panRef.current;
+      if (!pan || pan.pointerId !== event.pointerId) return;
+      const dx = event.clientX - pan.x;
+      const dy = event.clientY - pan.y;
+      if (!pan.moved && dx * dx + dy * dy < 9) return;
+      if (!pan.moved) {
+        pan.moved = true;
+        stage.classList.add("is-panning");
+      }
+      event.preventDefault();
+      stage.scrollLeft = pan.sl - dx;
+      stage.scrollTop = pan.st - dy;
+    };
 
-  const handleStagePointerUp = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    const onPointerEnd = (event: PointerEvent) => {
       stopPan(event.pointerId);
-    },
-    [stopPan],
-  );
+    };
+
+    stage.addEventListener("pointerdown", onPointerDown);
+    stage.addEventListener("pointermove", onPointerMove, { passive: false });
+    stage.addEventListener("pointerup", onPointerEnd);
+    stage.addEventListener("pointercancel", onPointerEnd);
+    stage.addEventListener("lostpointercapture", onPointerEnd);
+
+    return () => {
+      stage.removeEventListener("pointerdown", onPointerDown);
+      stage.removeEventListener("pointermove", onPointerMove);
+      stage.removeEventListener("pointerup", onPointerEnd);
+      stage.removeEventListener("pointercancel", onPointerEnd);
+      stage.removeEventListener("lostpointercapture", onPointerEnd);
+    };
+  }, [stopPan]);
 
   /* ── handlers ────────────────────────────────────────────────────────── */
 
@@ -394,25 +421,32 @@ export default function JournalApp() {
     });
   }, []);
 
-  const handleToggleRail = useCallback(() => setRailCollapsed((prev) => !prev), []);
+  const handleToggleRail = useCallback(() => {
+    const narrow = window.matchMedia(narrowUiQuery()).matches;
+    const opening = railCollapsedRef.current;
+    if (!opening) {
+      restoreSettingsFocus();
+    }
+    if (opening && narrow) {
+      setAccountOpen(false);
+    }
+    setRailCollapsed(!opening);
+  }, []);
 
   const handleRailViewChange = useCallback(
     (view: RailView) => {
       if (view === "files") {
         if (!user) {
           setFilesOpen(false);
-          syncJournalUrl({ files: false });
         } else {
           setFilesOpen(true);
           setRailCollapsed(false);
-          syncJournalUrl({ files: true });
         }
       } else {
         setFilesOpen(false);
         setDesignFocusToken((token) => token + 1);
         setOpenSections((prev) => ({ ...prev, designs: true }));
         setRailCollapsed(false);
-        syncJournalUrl({ files: false });
       }
     },
     [user],
@@ -421,47 +455,59 @@ export default function JournalApp() {
   useEffect(() => {
     if (!sessionReady || user || !filesOpen) return;
     setFilesOpen(false);
-    syncJournalUrl({ files: false });
   }, [sessionReady, user, filesOpen]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    syncJournalUrl({
+      files: filesPanelOpen,
+      account: accountOpen,
+    });
+  }, [hydrated, filesPanelOpen, accountOpen]);
+
+  useEffect(() => {
+    if (!hydrated || !filesPanelOpen) return;
+    if (accountOpen) setAccountOpen(false);
+    if (railCollapsed) setRailCollapsed(false);
+  }, [hydrated, filesPanelOpen, accountOpen, railCollapsed]);
 
   const handleCloseAccount = useCallback(() => {
     setAccountOpen(false);
-    syncJournalUrl({ account: false });
   }, []);
 
   const toggleAccount = useCallback(() => {
-    setAccountOpen((open) => {
-      const next = !open;
-      syncJournalUrl({ account: next });
-      return next;
-    });
+    const narrow = window.matchMedia(narrowUiQuery()).matches;
+    const next = !accountOpenRef.current;
+    setAccountOpen(next);
+    if (next && narrow) {
+      setRailCollapsed(true);
+    }
   }, []);
-
-  useEffect(() => {
-    if (filesPanelOpen) setRailCollapsed(false);
-  }, [filesPanelOpen]);
 
   useEffect(() => {
     const mq = window.matchMedia(narrowUiQuery());
     const syncRail = () => {
-      if (mq.matches) {
-        setRailCollapsed(startRailCollapsed(true, filesPanelOpen));
-        return;
-      }
+      let stored: boolean | undefined;
       try {
         const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as {
           railCollapsed?: boolean;
         };
-        setRailCollapsed(
-          typeof parsed.railCollapsed === "boolean" ? parsed.railCollapsed : false,
-        );
+        if (typeof parsed.railCollapsed === "boolean") stored = parsed.railCollapsed;
       } catch {
-        setRailCollapsed(false);
+        // Ignore unreadable storage during resize.
       }
+      setRailCollapsed((current) =>
+        railCollapsedAfterViewportChange(mq.matches, filesPanelOpen, current, stored),
+      );
     };
     mq.addEventListener("change", syncRail);
     return () => mq.removeEventListener("change", syncRail);
   }, [filesPanelOpen]);
+
+  useEffect(() => {
+    if (!railCollapsed) return;
+    restoreSettingsFocus();
+  }, [railCollapsed]);
 
   useEffect(() => {
     if (railCollapsed) return;
@@ -473,6 +519,21 @@ export default function JournalApp() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [railCollapsed]);
+
+  useEffect(() => {
+    const syncOverlay = () => {
+      const narrow = window.matchMedia(narrowUiQuery()).matches;
+      const overlay = narrow && (!railCollapsed || accountOpen);
+      document.documentElement.classList.toggle("is-mobile-overlay", overlay);
+    };
+    syncOverlay();
+    const mq = window.matchMedia(narrowUiQuery());
+    mq.addEventListener("change", syncOverlay);
+    return () => {
+      mq.removeEventListener("change", syncOverlay);
+      document.documentElement.classList.remove("is-mobile-overlay");
+    };
+  }, [railCollapsed, accountOpen]);
 
   useEffect(() => {
     if (railView !== "design" || designFocusToken === 0) return;
@@ -627,17 +688,18 @@ export default function JournalApp() {
       <main id="journal-main" className="desk" ref={deskRef} tabIndex={-1}>
         <h1 className="visually-hidden">Scripture Journal</h1>
         <div className="topbar">
-          <div className="topbar-left">
+          <div className="topbar-head">
             {railCollapsed ? (
               <button
                 type="button"
-                className="rail-toggle is-label"
+                className="rail-toggle is-label topbar-settings"
                 aria-expanded={false}
                 aria-controls="settings-rail"
                 aria-label="Show settings"
                 onClick={handleToggleRail}
               >
                 <svg
+                  className="topbar-settings-icon topbar-settings-icon--chevron"
                   width="12"
                   height="12"
                   viewBox="0 0 24 24"
@@ -650,7 +712,22 @@ export default function JournalApp() {
                 >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
-                Settings
+                <svg
+                  className="topbar-settings-icon topbar-settings-icon--gear"
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <span className="topbar-btn-label">Settings</span>
               </button>
             ) : null}
             <div className="topbar-copy">
@@ -664,52 +741,55 @@ export default function JournalApp() {
               </div>
             </div>
           </div>
-          <div className="topbar-right">
-            <Suspense>
-              <AppNav />
-            </Suspense>
-            <div className="zoom-row">
-              <ZoomControl
-                fit={zoomFit}
-                scale={scale}
-                onFitChange={setZoomFit}
-                onScaleChange={setCustomScale}
-              />
+          <div className="topbar-actions">
+            <div className="topbar-tools">
+              <Suspense>
+                <AppNav />
+              </Suspense>
+              <div className="zoom-row">
+                <ZoomControl
+                  fit={zoomFit}
+                  scale={scale}
+                  onFitChange={setZoomFit}
+                  onScaleChange={setCustomScale}
+                />
 
-              <button
-                type="button"
-                className="download-button is-label"
-                onClick={() => window.print()}
-                disabled={!canPrint}
-                aria-label="Print or save as PDF"
-                title={
-                  canPrint
-                    ? `Print or save as PDF — ${pageCountLabel}`
-                    : limitCheck.ok
-                      ? "Nothing to print yet"
-                      : limitCheck.message
-                }
-              >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+                <button
+                  type="button"
+                  className="download-button"
+                  onClick={() => window.print()}
+                  disabled={!canPrint}
+                  aria-label="Print or save as PDF"
+                  title={
+                    canPrint
+                      ? `Print or save as PDF — ${pageCountLabel}`
+                      : limitCheck.ok
+                        ? "Nothing to print yet"
+                        : limitCheck.message
+                  }
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Print
-              </button>
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <Suspense>
-              <AccountControl />
+              <div className="topbar-account">
+                <AccountControl />
+              </div>
             </Suspense>
           </div>
         </div>
@@ -720,11 +800,6 @@ export default function JournalApp() {
           tabIndex={0}
           role="region"
           aria-label="Journal page preview"
-          onPointerDown={handleStagePointerDown}
-          onPointerMove={handleStagePointerMove}
-          onPointerUp={handleStagePointerUp}
-          onPointerCancel={handleStagePointerUp}
-          onLostPointerCapture={handleStagePointerUp}
           onDragStart={(event) => event.preventDefault()}
         >
           <div className="preview-canvas">
