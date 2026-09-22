@@ -122,6 +122,12 @@ def test_helloao_discovery_skips_curated_open_english_ids():
 def test_api_bible_discovery_skips_curated_ids():
     """The NIV is already offered as `niv`; a second `ab-…` copy must not appear."""
     assert _from_api_bible({"id": "78a9f6124f344018-01"}) is None
+    assert _from_api_bible({"id": "a556c5305ee15c3f-01"}) is None  # CSB
+
+
+def test_api_bible_discovery_skips_omitted_msg():
+    """MSG was removed from the curated list and must not reappear as ab-…."""
+    assert _from_api_bible({"id": "6f11a7de016f942e-01", "abbreviation": "MSG"}) is None
 
 
 def test_api_bible_discovery_skips_ids_claimed_by_a_curated_slug():

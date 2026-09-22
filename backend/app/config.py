@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     #: production and preview always force false via get_settings().
     single_user: bool = False
 
-    #: Extra ids or abbreviations to omit, comma-separated (e.g. `nasb,msg`).
+    #: Extra ids or abbreviations to omit, comma-separated (e.g. `nasb,csb`).
     #: `niv` is already omitted on Vercel production/preview with no env var.
     hidden_translation_ids: str = ""
 

@@ -91,8 +91,8 @@ CURATED: tuple[Translation, ...] = (
         "b8ee27bcd1cae43a-01", limits=API_BIBLE_PRINT_LIMITS,
     ),
     Translation(
-        "msg", "MSG — The Message", "api_bible",
-        "6f11a7de016f942e-01", limits=API_BIBLE_PRINT_LIMITS,
+        "csb", "CSB — Christian Standard Bible", "api_bible",
+        "a556c5305ee15c3f-01", limits=API_BIBLE_PRINT_LIMITS,
     ),
     Translation("kjv", "KJV — King James Version", "api_bible", "de4e12af7f28f599-01"),
     Translation("asv", "ASV — American Standard Version", "api_bible", "06125adad2d5898a-01"),
@@ -331,6 +331,11 @@ CURATED_HELLOAO_UPSTREAM |= {
     if choice.source == "helloao"
 }
 
+# Formerly curated (or never offered) api.bible editions — skip rediscovery.
+_OMITTED_API_BIBLE_IDS = frozenset({
+    "6f11a7de016f942e-01",  # MSG — The Message
+})
+
 
 def _from_api_bible(entry: dict[str, Any]) -> Translation | None:
     """A discovered api.bible entry, offered uncapped.
@@ -341,8 +346,12 @@ def _from_api_bible(entry: dict[str, Any]) -> Translation | None:
     give it a curated entry above with `limits=API_BIBLE_PRINT_LIMITS`.
     """
     bible_id = entry.get("id")
-    if not bible_id or bible_id in CURATED_UPSTREAM:
-        return None  # already offered under a friendly slug
+    if (
+        not bible_id
+        or bible_id in CURATED_UPSTREAM
+        or bible_id in _OMITTED_API_BIBLE_IDS
+    ):
+        return None  # already offered under a friendly slug, or deliberately omitted
 
     language = entry.get("language") or {}
     short = entry.get("abbreviation") or entry.get("abbreviationLocal") or ""

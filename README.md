@@ -81,7 +81,7 @@ enforced in `usage_limits.py` and mirrored in `frontend/src/lib/limits.ts`
 
 | Translations | Cap |
 | --- | --- |
-| NIV, NASB, MSG (api.bible, copyright-reserved) | 100 verses ([api.bible §12](https://api.bible/terms-and-conditions#acceptable_use), printing) |
+| NIV, NASB, CSB (api.bible, copyright-reserved) | 100 verses ([api.bible §12](https://api.bible/terms-and-conditions#acceptable_use), printing) |
 | ESV (Crossway) | 500 verses or half a book, whichever is smaller; single-chapter books exempt |
 | Public-domain / open (KJV, ASV, WEB, DRA, GNV, FBV; `ao-*`; curated CJK; `bbe`/`darby`/`ylt`; `oeb`; `webbe`) | none |
 
@@ -122,8 +122,8 @@ deploying publicly or changing a cap.
 ## Setup
 
 No keys required — the two keyless sources supply ~1,250 translations. An
-api.bible key (free, <https://scripture.api.bible/>) adds NIV, KJV, NASB, MSG
-and ~245 others. A Crossway key (free for non-commercial use,
+api.bible key (free, <https://scripture.api.bible/>) adds NIV, KJV, NASB, CSB
+and ~245 others. CSB needs Lifeway Holman access enabled on the api.bible key. A Crossway key (free for non-commercial use,
 <https://api.esv.org/>) adds the ESV. When the api.bible key is present, OCCB
 and WEBBE switch to it (`occb`, `occbt`, `webbe`) and helloao copies are hidden.
 
@@ -202,7 +202,7 @@ Names only — never commit values. Local: `backend/.env`, `frontend/.env.local`
 | `SUPABASE_URL` | backend | for accounts / files / saved layouts | required for those features |
 | `SUPABASE_ANON_KEY` | backend | `.env` | required for those features |
 | `SINGLE_USER` | backend | `true` allowed locally | **forced `false`** on production and preview. `vercel dev` (`VERCEL_ENV=development`) counts as local |
-| `HIDDEN_TRANSLATION_IDS` | backend | leave unset | extra ids to omit, e.g. `nasb,msg`. **NIV is already omitted** on production and preview |
+| `HIDDEN_TRANSLATION_IDS` | backend | leave unset | extra ids to omit, e.g. `nasb,csb`. **NIV is already omitted** on production and preview |
 | `API_URL` | frontend | default `http://127.0.0.1:8000` | API project's URL, **no trailing slash**. Read at **build time** in `next.config.ts` — changing it requires a frontend redeploy |
 
 `SINGLE_USER=true` lifts api.bible's 100-verse print cap for a sole licensee;

@@ -105,7 +105,7 @@ def test_shared_instance_keeps_every_cap():
 def test_single_user_lifts_the_api_bible_print_cap():
     """api.bible §12 restricts *end users*; with none, it does not bind."""
     settings = Settings(single_user=True)
-    for translation_id in ("niv", "nasb", "msg"):
+    for translation_id in ("niv", "nasb", "csb"):
         assert _for_deployment(_curated(translation_id), settings).limits == NO_LIMITS
 
 
