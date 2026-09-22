@@ -11,7 +11,34 @@ from typing import Any
 from ...schemas import Paragraph, Segment, Verse
 
 HEADING_STYLE = re.compile(r"^(s\d?|ms\d?|mr|r|d)$")
-ITALIC_STYLES = {"add", "qt"}
+ITALIC_STYLES = {"add", "qt", "em"}
+# Superscript footnote callers (often a lone ",") — not scripture text.
+SKIP_CHAR_STYLES = {"sup"}
+# CSB (and some Holman exports) wrap em dashes as "#— #", often with NBSP.
+EM_DASH_MARK = re.compile(r"\xa0?#\s*—\s*#\xa0?")
+MULTI_SPACE = re.compile(r" {2,}")
+
+
+def _clean_text(text: str) -> str:
+    """Normalize CSB/api.bible text quirks before storing a segment."""
+    text = EM_DASH_MARK.sub("—", text)
+    text = text.replace("\xa0", " ")
+    text = MULTI_SPACE.sub(" ", text)
+    return text
+
+
+def _append_segment(para: Paragraph, text: str, *, wj: bool, italic: bool) -> None:
+    if not para.verses:
+        para.verses.append(Verse())
+    segments = para.verses[-1].segments
+    # CSB often puts NBSP before a "#— #" mark in the previous run.
+    if segments and text.startswith("—") and segments[-1].text.endswith(" "):
+        segments[-1].text = segments[-1].text.rstrip()
+    if segments and segments[-1].text.endswith("—") and text.startswith(" "):
+        text = text.lstrip()
+        if not text:
+            return
+    segments.append(Segment(text=text, wj=wj, italic=italic))
 
 
 def _walk(items: list[dict[str, Any]] | None, para: Paragraph, *, wj: bool, italic: bool) -> None:
@@ -19,15 +46,13 @@ def _walk(items: list[dict[str, Any]] | None, para: Paragraph, *, wj: bool, ital
         item_type = item.get("type")
 
         if item_type == "text":
-            text = item.get("text")
+            text = _clean_text(item.get("text") or "")
             if not text:
                 continue
             if para.kind == "heading":
                 para.heading += text
                 continue
-            if not para.verses:
-                para.verses.append(Verse())
-            para.verses[-1].segments.append(Segment(text=text, wj=wj, italic=italic))
+            _append_segment(para, text, wj=wj, italic=italic)
 
         elif item_type == "tag":
             name = item.get("name")
@@ -39,6 +64,8 @@ def _walk(items: list[dict[str, Any]] | None, para: Paragraph, *, wj: bool, ital
             elif name == "note":
                 continue
             elif name == "char":
+                if style in SKIP_CHAR_STYLES:
+                    continue
                 _walk(
                     item.get("items"),
                     para,

@@ -190,6 +190,81 @@ def test_api_bible_trim_keeps_only_the_requested_verses():
     assert numbers == ["2"]
 
 
+def test_api_bible_drops_superscript_footnote_callers():
+    """CSB marks footnotes as char/sup (often a lone comma) — not scripture."""
+    content = [
+        {
+            "type": "tag",
+            "name": "para",
+            "attrs": {"style": "p"},
+            "items": [
+                {"type": "tag", "name": "verse", "attrs": {"number": "3"}},
+                {
+                    "type": "tag",
+                    "name": "char",
+                    "attrs": {"style": "wj"},
+                    "items": [
+                        {
+                            "type": "text",
+                            "text": "“Truly I tell you, unless someone is born again,",
+                        }
+                    ],
+                },
+                {
+                    "type": "tag",
+                    "name": "char",
+                    "attrs": {"style": "sup"},
+                    "items": [{"type": "text", "text": ","}],
+                },
+                {"type": "text", "text": " "},
+                {
+                    "type": "tag",
+                    "name": "char",
+                    "attrs": {"style": "wj"},
+                    "items": [{"type": "text", "text": "he cannot see the kingdom of God.”"}],
+                },
+            ],
+        }
+    ]
+    assert text_of(parse_content(content)) == (
+        "“Truly I tell you, unless someone is born again, "
+        "he cannot see the kingdom of God.”"
+    )
+
+
+def test_api_bible_normalizes_csb_em_dash_marks_and_nbsp():
+    """Holman CSB wraps em dashes as '#— #' and pads with NBSP."""
+    content = [
+        {
+            "type": "tag",
+            "name": "para",
+            "attrs": {"style": "p"},
+            "items": [
+                {"type": "tag", "name": "verse", "attrs": {"number": "13"}},
+                {
+                    "type": "text",
+                    "text": "except the one who descended from heaven\xa0",
+                },
+                {
+                    "type": "tag",
+                    "name": "char",
+                    "attrs": {"style": "wj"},
+                    "items": [{"type": "text", "text": "#—\xa0#the Son of Man."}],
+                },
+                {
+                    "type": "tag",
+                    "name": "char",
+                    "attrs": {"style": "sup"},
+                    "items": [{"type": "text", "text": ","}],
+                },
+            ],
+        }
+    ]
+    assert text_of(parse_content(content)) == (
+        "except the one who descended from heaven—the Son of Man."
+    )
+
+
 def test_orphan_heading_is_dropped_after_trimming():
     """A heading whose verses were all trimmed away must not be left behind."""
     paragraphs = trim_verses(parse_content(API_BIBLE_CONTENT), first=9, last=9)
