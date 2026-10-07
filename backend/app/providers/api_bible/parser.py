@@ -82,11 +82,19 @@ def trim_verses(
     first: int | None = None,
     last: int | None = None,
 ) -> list[Paragraph]:
-    """Drop verses outside [first, last]; used on the end chapters of a range."""
+    """Drop verses outside [first, last]; used on the end chapters of a range.
+
+    Unnumbered runs (common in CSB poetry: each `qc`/`q*` line is its own
+    paragraph with no verse tag) continue the most recent numbered verse, so
+    retention must carry across paragraph boundaries — not only within one
+    paragraph after a numbered sibling.
+    """
     if first is None and last is None:
         return paragraphs
 
     kept_paragraphs: list[Paragraph] = []
+    # True while the last numbered verse we saw was inside the keep window.
+    keep_continuations = False
 
     for para in paragraphs:
         if para.kind != "text":
@@ -97,15 +105,15 @@ def trim_verses(
         for verse in para.verses:
             number = int(verse.number) if verse.number and verse.number.isdigit() else None
             if number is None:
-                # Unnumbered lead-in text belongs to the verse before it.
-                if kept:
+                if keep_continuations:
                     kept.append(verse)
                 continue
-            if first is not None and number < first:
-                continue
-            if last is not None and number > last:
-                continue
-            kept.append(verse)
+            in_range = (first is None or number >= first) and (
+                last is None or number <= last
+            )
+            keep_continuations = in_range
+            if in_range:
+                kept.append(verse)
 
         if kept:
             para.verses = kept

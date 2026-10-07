@@ -190,6 +190,75 @@ def test_api_bible_trim_keeps_only_the_requested_verses():
     assert numbers == ["2"]
 
 
+# CSB Ruth 1:16–17 shape: numbered lead-in, then unnumbered `qc` poetry lines,
+# then verse 17 mid-poetry. Fixtures only — no live api.bible call.
+CSB_RUTH_POETRY = [
+    {
+        "type": "tag",
+        "name": "para",
+        "attrs": {"style": "p"},
+        "items": [
+            {"type": "tag", "name": "verse", "attrs": {"number": "16"}},
+            {"type": "text", "text": "But Ruth replied:"},
+        ],
+    },
+    {
+        "type": "tag",
+        "name": "para",
+        "attrs": {"style": "qc"},
+        "items": [{"type": "text", "text": "Don’t plead with me to abandon you"}],
+    },
+    {
+        "type": "tag",
+        "name": "para",
+        "attrs": {"style": "qc"},
+        "items": [{"type": "text", "text": "or to return and not follow you."}],
+    },
+    {
+        "type": "tag",
+        "name": "para",
+        "attrs": {"style": "qc"},
+        "items": [
+            {"type": "tag", "name": "verse", "attrs": {"number": "17"}},
+            {"type": "text", "text": "Where you die, I will die,"},
+        ],
+    },
+    {
+        "type": "tag",
+        "name": "para",
+        "attrs": {"style": "qc"},
+        "items": [{"type": "text", "text": "and there I will be buried."}],
+    },
+    {
+        "type": "tag",
+        "name": "para",
+        "attrs": {"style": "m"},
+        "items": [
+            {"type": "tag", "name": "verse", "attrs": {"number": "18"}},
+            {"type": "text", "text": "When Naomi saw that Ruth was determined…"},
+        ],
+    },
+]
+
+
+def test_trim_keeps_csb_poetry_lines_without_verse_tags():
+    """Unnumbered poetry paras continue the prior verse across paragraph breaks."""
+    full = trim_verses(parse_content(CSB_RUTH_POETRY), first=1, last=22)
+    assert "Don’t plead with me" in text_of(full)
+    assert "and there I will be buried." in text_of(full)
+
+    only_16 = trim_verses(parse_content(CSB_RUTH_POETRY), first=16, last=16)
+    assert "Don’t plead with me" in text_of(only_16)
+    assert "Where you die" not in text_of(only_16)
+    assert "buried" not in text_of(only_16)
+
+    only_17 = trim_verses(parse_content(CSB_RUTH_POETRY), first=17, last=17)
+    assert "Don’t plead" not in text_of(only_17)
+    assert "Where you die" in text_of(only_17)
+    assert "buried" in text_of(only_17)
+    assert "Naomi saw" not in text_of(only_17)
+
+
 def test_api_bible_drops_superscript_footnote_callers():
     """CSB marks footnotes as char/sup (often a lone comma) — not scripture."""
     content = [

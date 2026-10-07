@@ -2580,9 +2580,12 @@ button.api-warmup:hover,
 
   .preview-canvas {
     display: block;
-    width: auto;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
     padding: 0 !important;
     margin: 0;
+    overflow: visible !important;
   }
 
   .app {
@@ -2591,9 +2594,13 @@ button.api-warmup:hover,
     overflow: visible;
   }
 
+  /* Mobile Safari often prints the scaled preview box if the scaler still
+     clips; force full sheet size and let writing-area absolutes paint. */
   .pagestack-scaler {
     width: auto !important;
     height: auto !important;
+    overflow: visible !important;
+    transform: none !important;
   }
 
   .pagestack {
@@ -2604,5 +2611,6 @@ button.api-warmup:hover,
   .jpage {
     box-shadow: none !important;
     margin: 0 !important;
+    overflow: visible !important;
   }
 }
