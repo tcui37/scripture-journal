@@ -28,8 +28,12 @@ export interface Block {
 
 /** Space from translation text to the parallel rule, each side. */
 const DIVIDER_INSET = 20;
-/** Total gutter reserved between the two translations (both insets). */
-export const PARALLEL_GAP = DIVIDER_INSET * 2;
+/**
+ * Total gutter reserved between the two translations. Each half of the grid
+ * loses its inset, and the first half also the 1px rule, so reserve that on
+ * both sides — measuring the first half 1px too wide rewraps and clips it.
+ */
+export const PARALLEL_GAP = (DIVIDER_INSET + 1) * 2;
 
 /** Side-by-side translations that paginate independently, with a column rule. */
 export function combineParallelColumns(primary: string, secondary: string) {

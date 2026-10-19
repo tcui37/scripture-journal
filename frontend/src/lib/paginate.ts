@@ -32,7 +32,10 @@ export class Measurer {
   measure(html: string, width: number) {
     this.element.style.width = `${width}px`;
     this.element.innerHTML = html;
-    return this.element.offsetHeight;
+    // Fractional, not offsetHeight: that rounds each block to whole pixels,
+    // and over a page of short poetry lines the shortfall adds up to a
+    // clipped last line.
+    return this.element.getBoundingClientRect().height;
   }
 
   destroy() {
