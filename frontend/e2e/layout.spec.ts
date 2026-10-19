@@ -14,7 +14,10 @@ import type { LayoutCase } from "./layout-harness";
  */
 
 const here = __dirname;
-const fixtures = readdirSync(path.join(here, "fixtures")).filter((name) => name.endsWith(".json"));
+// LAYOUT_FIXTURES points at another folder of passages — for checking
+// licensed text locally, which must never be committed.
+const fixtureDir = process.env.LAYOUT_FIXTURES ?? path.join(here, "fixtures");
+const fixtures = readdirSync(fixtureDir).filter((name) => name.endsWith(".json"));
 
 function cases(): LayoutCase[] {
   const out: LayoutCase[] = [];
@@ -53,7 +56,7 @@ test.beforeAll(async () => {
 
 for (const name of fixtures) {
   test(`typesets ${name.replace(/\.json$/, "")} without losing text`, async ({ page }) => {
-    const passage = JSON.parse(readFileSync(path.join(here, "fixtures", name), "utf8"));
+    const passage = JSON.parse(readFileSync(path.join(fixtureDir, name), "utf8"));
     // The app page, so the real webfonts and stylesheet are what get measured.
     await page.goto("/");
     await page.evaluate(() => document.fonts.ready);

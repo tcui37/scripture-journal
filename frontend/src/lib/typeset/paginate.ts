@@ -10,7 +10,7 @@
 
 import type { Block } from "./blocks";
 import { geometry } from "./render";
-import type { Settings } from "./types";
+import type { Settings } from "../types";
 
 /** Minimum room a heading needs below it to avoid being stranded. */
 const ORPHAN_GUARD = 40;
