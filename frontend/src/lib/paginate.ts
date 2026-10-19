@@ -40,6 +40,40 @@ export class Measurer {
   }
 }
 
+/** Largest candidate that fits, or 0. Height grows with the end, so bisect. */
+function largestFitting(candidates: number[], fits: (end: number) => boolean): number {
+  let best = 0;
+  let low = 0;
+  let high = candidates.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (fits(candidates[mid])) {
+      best = candidates[mid];
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return best;
+}
+
+/** As `largestFitting`, over every end in [from, to]. */
+function largestFittingIn(from: number, to: number, fits: (end: number) => boolean): number {
+  let best = 0;
+  let low = from;
+  let high = to;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (fits(mid)) {
+      best = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return best;
+}
+
 /** Returns one entry per page, each holding that page's slot markup. */
 export function paginate(
   blocks: Block[],
@@ -88,32 +122,41 @@ export function paginate(
       }
 
       const room = slotHeight - currentHeight;
-      const remaining = block.units - offset;
-      let fits = 0;
+      const fitsTo = (end: number) =>
+        measurer.measure(block.render(offset, end), slotWidth) <= room;
+      // Candidate split points strictly inside what is left, preferring the
+      // block's own breaks (verse starts) over arbitrary units (words).
+      const preferred = (block.breaks ?? []).filter(
+        (unit) => unit > offset && unit < block.units,
+      );
+      let end = 0;
 
-      if (remaining > 1 && room > MIN_SPLIT_ROOM) {
-        let low = 1;
-        let high = remaining - 1;
-        while (low <= high) {
-          const mid = (low + high) >> 1;
-          if (measurer.measure(block.render(offset, offset + mid), slotWidth) <= room) {
-            fits = mid;
-            low = mid + 1;
-          } else {
-            high = mid - 1;
-          }
+      // An empty slot is always worth splitting into, however small it is.
+      if (block.units - offset > 1 && (room > MIN_SPLIT_ROOM || !current)) {
+        end = block.breaks
+          ? largestFitting(preferred, fitsTo)
+          : largestFittingIn(offset + 1, block.units - 1, fitsTo);
+        // A stretch between breaks taller than a whole slot can only be
+        // placed by splitting inside it, so do that rather than overflow.
+        if (!end && !current && block.breaks) {
+          end = largestFittingIn(offset + 1, (preferred[0] ?? block.units) - 1, fitsTo);
         }
       }
 
-      if (fits > 0) {
-        current += block.render(offset, offset + fits);
-        offset += fits;
+      if (end > 0) {
+        current += block.render(offset, end);
+        offset = end;
         nextSlot();
       } else if (current) {
         // Nothing fits here, but the slot has content: start a fresh one.
         nextSlot();
+      } else if (block.units - offset > 1) {
+        // Not even one unit fits an empty slot. Let that unit overflow, but
+        // carry the rest on — overflowing the whole block would hide it.
+        current += block.render(offset, offset + 1);
+        offset += 1;
+        nextSlot();
       } else {
-        // An empty slot still can't hold it — let it overflow rather than loop.
         current += html;
         currentHeight += height;
         break;

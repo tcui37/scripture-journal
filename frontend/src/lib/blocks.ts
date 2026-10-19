@@ -9,13 +9,19 @@
 import { HAIRLINE } from "./constants";
 import { chapterHtml, headingHtml, paragraphHtml, typeCss, verseHtml } from "./render";
 import type { AlignedRow } from "./parallel";
-import type { Paragraph, Settings } from "./types";
+import type { Paragraph, Segment, Settings, Verse } from "./types";
 
 export interface Block {
-  /** Splittable sub-units (verses). 1 means indivisible. */
+  /** Splittable sub-units (words). 1 means indivisible. */
   units: number;
   /** Render units [from, to); omitting `to` renders to the end. */
   render: (from?: number, to?: number) => string;
+  /**
+   * Unit offsets where a split reads well (verse starts), ascending. When set,
+   * pagination splits only here unless a single stretch between two of them
+   * cannot fit even an empty slot.
+   */
+  breaks?: number[];
   /** Avoid leaving this block stranded at the foot of a column. */
   keepWithNext?: boolean;
 }
@@ -54,12 +60,61 @@ export function paragraphBlocks(paragraphs: Paragraph[], settings: Settings): Bl
         render: () => paragraphHtml(paragraph, settings),
       };
     }
+    const words = paragraph.verses.map(wordStarts);
+    const breaks: number[] = [];
+    let units = 0;
+    for (const starts of words) {
+      breaks.push(units);
+      units += Math.max(1, starts.length);
+    }
     return {
-      units: paragraph.verses.length,
-      render: (from = 0, to?: number) =>
-        paragraphHtml({ ...paragraph, verses: paragraph.verses.slice(from, to) }, settings),
+      units,
+      breaks,
+      render: (from = 0, to = units) => {
+        const verses: Verse[] = [];
+        paragraph.verses.forEach((verse, index) => {
+          const start = breaks[index];
+          const count = Math.max(1, words[index].length);
+          const a = Math.max(from, start) - start;
+          const b = Math.min(to, start + count) - start;
+          if (a >= b) return;
+          verses.push(a === 0 && b === count ? verse : sliceVerse(verse, words[index], a, b));
+        });
+        return paragraphHtml({ ...paragraph, verses }, settings);
+      },
     };
   });
+}
+
+/** Character offsets where each word of a verse begins. */
+function wordStarts(verse: Verse): number[] {
+  const text = verse.segments.map((segment) => segment.text).join("");
+  const starts: number[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    if (/\S/.test(text[i]) && (i === 0 || /\s/.test(text[i - 1]))) starts.push(i);
+  }
+  return starts;
+}
+
+/**
+ * Words [from, to) of a verse, keeping each segment's styling. Only the piece
+ * holding the first word keeps the verse number, so a verse broken across
+ * columns is numbered once.
+ */
+function sliceVerse(verse: Verse, starts: number[], from: number, to: number): Verse {
+  const begin = starts[from] ?? 0;
+  const end = starts[to] ?? Infinity;
+  const segments: Segment[] = [];
+  let offset = 0;
+  for (const segment of verse.segments) {
+    const a = Math.max(begin, offset) - offset;
+    const b = Math.min(end, offset + segment.text.length) - offset;
+    if (a < b) segments.push({ ...segment, text: segment.text.slice(a, b) });
+    offset += segment.text.length;
+  }
+  const last = segments[segments.length - 1];
+  if (last) last.text = last.text.trimEnd();
+  return { number: from === 0 ? verse.number : null, segments };
 }
 
 /** One block per aligned row; rows are indivisible so the columns stay level. */

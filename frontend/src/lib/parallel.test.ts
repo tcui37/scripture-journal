@@ -96,6 +96,39 @@ describe("alignPassages", () => {
     assert.equal(rows[3]?.number, "3");
     assert.equal(rows[3]?.primary, undefined);
   });
+  it("keeps verses with the same number in different chapters apart", () => {
+    const chapter = (heading: string): Paragraph => ({
+      kind: "chapter",
+      style: "c",
+      heading,
+      verses: [],
+    });
+    const passage = (tag: string): Paragraph[] => [
+      chapter("1"),
+      text([verse("1", `${tag} 1:1`), verse("2", `${tag} 1:2`)]),
+      {
+        kind: "text",
+        style: "p",
+        heading: "",
+        verses: [{ number: null, segments: [{ text: `${tag} 1:2b`, wj: false, italic: false }] }],
+      },
+      chapter("2"),
+      text([verse("1", `${tag} 2:1`)]),
+    ];
+    const rows = alignPassages(passage("A"), passage("B")).filter(
+      (row) => row.kind === "verse",
+    );
+    const joined = (v?: { segments: { text: string }[] }) =>
+      v?.segments.map((segment) => segment.text).join(" ");
+    assert.deepEqual(
+      rows.map((row) => [row.number, joined(row.primary), joined(row.secondary)]),
+      [
+        ["1", "A 1:1", "B 1:1"],
+        ["2", "A 1:2 A 1:2b", "B 1:2 B 1:2b"],
+        ["1", "A 2:1", "B 2:1"],
+      ],
+    );
+  });
 });
 
 describe("combineParallelColumns / Bands", () => {
