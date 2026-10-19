@@ -137,13 +137,15 @@ _ALTERNATES: dict[str, tuple[_Upstream, ...]] = {
 
 
 def _for_deployment(entry: Translation, settings: Settings) -> Translation:
-    """Drop caps that only bind when the app has users other than its owner.
+    """Lift the per-passage caps on a single-user (local) instance.
 
-    api.bible's print cap comes from a clause about restricting *end users*, so
-    it is lifted on a single-user instance. Crossway's cap restricts the
-    licensee directly and is left in place either way.
+    api.bible's print cap comes from a clause about restricting *end users*,
+    so it has no subject when the licensee is the only user. Crossway's cap
+    restricts the licensee directly; lifting it locally is the owner's own
+    choice under their key (SINGLE_USER is forced off on shared deploys, so
+    the deployed site stays capped). ESV text is still never stored.
     """
-    if settings.single_user and entry.limits == API_BIBLE_PRINT_LIMITS:
+    if settings.single_user and entry.limits in (API_BIBLE_PRINT_LIMITS, ESV_LIMITS):
         return replace(entry, limits=NO_LIMITS)
     return entry
 

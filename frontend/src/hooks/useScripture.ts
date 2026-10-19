@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 
 import { mergeBibles } from "@/lib/bibles";
+import { checkLimits, type LimitCheck } from "@/lib/limits";
 import {
   biblesQuery,
   booksQuery,
@@ -44,6 +45,8 @@ export interface Scripture {
   entireBook: () => void;
   passage: Passage | null;
   comparePassage: Passage | null;
+  /** The selection against every chosen translation's licence cap. */
+  limitCheck: LimitCheck;
   status: string;
   failed: boolean;
 }
@@ -169,9 +172,17 @@ export function useScripture(ready: boolean): Scripture {
   // never request a range built from a previous chapter's numbering.
   const rangeReady =
     startVerses.includes(reference.startVerse) && endVerses.includes(reference.endVerse);
+  // Over a licence cap the server would only refuse, so do not ask; the
+  // sidebar explains the cap where the range is chosen.
+  const limitCheck = checkLimits(
+    bibles,
+    [reference.bibleId, reference.compareId].filter(Boolean),
+    book,
+    reference,
+  );
   const passageResult = useQuery({
     ...passagePairQuery(reference),
-    enabled: ready && rangeReady,
+    enabled: ready && rangeReady && limitCheck.ok,
     // Keep the last passage on screen while the next one loads.
     placeholderData: keepPreviousData,
   });
@@ -200,7 +211,13 @@ export function useScripture(ready: boolean): Scripture {
             : "Fetching text…"
           : "";
 
-  const failed = Boolean(failure);
+  // Short and fixed, so the top bar never reflows; the full reason is in the
+  // sidebar under the range.
+  const overLimit = limitCheck.ok
+    ? ""
+    : `${limitCheck.label} allows ${limitCheck.cap} verses here · ${limitCheck.requested} selected`;
+
+  const failed = Boolean(failure || overLimit);
   // Drop the preview on any failure so a stale passage can't be printed.
   const pair = failed ? undefined : passageResult.data;
 
@@ -323,7 +340,8 @@ export function useScripture(ready: boolean): Scripture {
     entireBook,
     passage: pair?.primary ?? null,
     comparePassage: pair?.compare ?? null,
-    status: failure || loading,
+    limitCheck,
+    status: failure || overLimit || loading,
     failed,
   };
 }

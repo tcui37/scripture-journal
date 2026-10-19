@@ -51,9 +51,10 @@ class Settings(BaseSettings):
     #: api.bible's §12 DRM clause obliges a developer to build printing limits
     #: into "products" so that "end users" cannot copy or distribute licensed
     #: text. With no end users but the licensee, that obligation has no
-    #: subject, so the 100-verse print cap is lifted. Crossway's cap is *not*
-    #: lifted by this: it restricts the licensee's own display and storage and
-    #: names no end user. Leave this false for anything reachable by others.
+    #: subject, so the 100-verse print cap is lifted. Crossway's per-passage
+    #: cap is lifted too, as the owner's own choice: it binds the licensee
+    #: directly, so keeping within it locally is up to you. ESV text is never
+    #: stored either way. Leave this false for anything reachable by others.
     #:
     #: Default is false. Local `.env` may set SINGLE_USER=true. Vercel
     #: production and preview always force false via get_settings().

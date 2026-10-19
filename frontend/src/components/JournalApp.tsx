@@ -13,7 +13,6 @@ import { cssPageSize } from "@/lib/constants";
 import { printFilename } from "@/lib/filename";
 import { narrowUiQuery } from "@/lib/layout";
 import { licenceText, referenceLabel as nameRange } from "@/lib/licence";
-import { checkLimits } from "@/lib/limits";
 import {
   formatPageCountLabel,
   paginatePassages,
@@ -202,12 +201,7 @@ export default function JournalApp() {
   /* ── derived ─────────────────────────────────────────────────────────── */
 
   const bookName = scripture.book?.name;
-  const limitCheck = checkLimits(
-    scripture.bibles,
-    [reference.bibleId, reference.compareId].filter(Boolean),
-    scripture.book,
-    reference,
-  );
+  const { limitCheck } = scripture;
 
   const { citation, sources, copyright, notice } = useMemo(
     () =>
@@ -342,6 +336,7 @@ export default function JournalApp() {
                 className={`topbar-status${failed || fileStatus ? " is-error" : ""}`}
                 role="status"
                 aria-live="polite"
+                title={statusText}
               >
                 {statusText}
               </div>

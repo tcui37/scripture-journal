@@ -367,8 +367,9 @@ button {
 /* :focus-visible uses 2px outline + 2px offset — pad so rings aren't clipped.
    Keep overflow hidden + min-height 0 so the grid row can animate both ways. */
 .section.is-open > .section-panel > .section-panel-inner {
-  padding-block: 4px;
-  margin-block: -4px;
+  padding: 4px;
+  margin: -4px;
+  width: calc(100% + 8px);
 }
 
 .section-body {
@@ -1456,10 +1457,16 @@ button {
   display: none;
 }
 
+/* One line, always: a long status is cut with an ellipsis (full text in its
+   title) rather than wrapping and pushing the preview around. */
 .topbar-status {
   font-size: calc(12px * var(--ui-font-scale));
   color: var(--color-neutral-600);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .topbar-status.is-error {
@@ -1485,7 +1492,6 @@ button {
   }
 
   .topbar-status {
-    white-space: normal;
     line-height: 1.35;
   }
 
@@ -2319,7 +2325,6 @@ button.api-warmup:hover,
   }
 
   .topbar-status {
-    white-space: normal;
     line-height: 1.35;
   }
 

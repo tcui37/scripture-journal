@@ -109,10 +109,10 @@ def test_single_user_lifts_the_api_bible_print_cap():
         assert _for_deployment(_curated(translation_id), settings).limits == NO_LIMITS
 
 
-def test_single_user_does_not_lift_the_esv_cap():
-    """Crossway caps the licensee's own display, naming no end user."""
-    settings = Settings(single_user=True)
-    assert _for_deployment(_curated("esv"), settings).limits == ESV_LIMITS
+def test_single_user_lifts_the_esv_cap_by_owner_choice():
+    """Local single-user instances run uncapped; shared deploys keep the cap."""
+    assert _for_deployment(_curated("esv"), Settings(single_user=True)).limits == NO_LIMITS
+    assert _for_deployment(_curated("esv"), Settings(single_user=False)).limits == ESV_LIMITS
 
 
 def test_single_user_leaves_public_domain_entries_alone():

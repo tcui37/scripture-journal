@@ -20,7 +20,7 @@ from app.catalog import (
     _resolve,
 )
 from app.config import Settings
-from app.usage_limits import NO_LIMITS
+from app.usage_limits import ESV_LIMITS, NO_LIMITS
 
 
 def _curated(translation_id: str):
@@ -432,3 +432,13 @@ async def test_helloao_feb_is_hidden_when_api_bible_has_it():
     feb = [entry for entry in chinese if "FEB" in entry.label]
     assert len(feb) == 1
     assert feb[0].source == "api_bible"
+
+
+def test_single_user_lifts_the_esv_cap_locally():
+    resolved = _resolve(_curated("esv"), _settings(esv_api_key="test", single_user=True))
+    assert resolved is not None and resolved.limits == NO_LIMITS
+
+
+def test_shared_instance_keeps_the_esv_cap():
+    resolved = _resolve(_curated("esv"), _settings(esv_api_key="test", single_user=False))
+    assert resolved is not None and resolved.limits == ESV_LIMITS

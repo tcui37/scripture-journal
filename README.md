@@ -222,8 +222,10 @@ Names only — never commit values. Local: `backend/.env`, `frontend/.env.local`
 | `HIDDEN_TRANSLATION_IDS` | backend | leave unset | extra ids to omit, e.g. `nasb,csb`. **NIV is already omitted** on production and preview |
 | `API_URL` | frontend | default `http://127.0.0.1:8000` | API project's URL, **no trailing slash**. Read at **build time** in `next.config.ts` — changing it requires a frontend redeploy |
 
-`SINGLE_USER=true` lifts api.bible's 100-verse print cap for a sole licensee;
-Crossway's ESV cap is never lifted.
+`SINGLE_USER=true` (local only) lifts api.bible's 100-verse print cap for a
+sole licensee, and Crossway's per-passage ESV cap as well. Crossway's terms
+bind the key holder directly, so staying within them locally is your call.
+Shared deploys force it off, so the public site stays capped.
 
 ## Deploying to Vercel
 

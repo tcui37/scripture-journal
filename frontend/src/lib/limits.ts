@@ -13,10 +13,12 @@ export interface LimitCheck {
   requested: number;
   /** Largest allowed selection, or null when unrestricted. */
   cap: number | null;
+  /** Short name of the translation that set the cap, e.g. "ESV". */
+  label: string;
   message: string;
 }
 
-const OK: LimitCheck = { ok: true, requested: 0, cap: null, message: "" };
+const OK: LimitCheck = { ok: true, requested: 0, cap: null, label: "", message: "" };
 
 export function versesInRange(book: Book | undefined, reference: Reference): number {
   if (!book) return 0;
@@ -67,6 +69,7 @@ export function checkLimits(
         ok: false,
         requested,
         cap,
+        label,
         message:
           `${label} allows at most ${cap} verses at once — ${requested} selected. ` +
           (bible?.limits?.note ?? ""),
