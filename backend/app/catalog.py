@@ -6,16 +6,17 @@ fixed; bible.helloao.org contributes a further thousand-odd translations that
 are discovered at run time and prefixed `ao-`.
 
 When more than one upstream carries the same text, only the most trusted
-listing is kept. See `SOURCE_TRUST`.
+listing is kept. See `SOURCE_TRUST` in `app.sources`.
 """
 
 import asyncio
 from dataclasses import dataclass, replace
-from typing import Any, Literal
+from typing import Any
 
 from .config import Settings
 from .providers.api_bible import ApiBibleClient
 from .providers.helloao import HelloAoClient
+from .sources import SOURCE_TRUST, SOURCES, Source
 from .usage_limits import (
     API_BIBLE_PRINT_LIMITS,
     ESV_LIMITS,
@@ -23,24 +24,10 @@ from .usage_limits import (
     UsageLimits,
 )
 
-Source = Literal["api_bible", "esv", "bible_api", "helloao"]
 
 HELLOAO_PREFIX = "ao-"
 API_BIBLE_PREFIX = "ab-"
 BIBLE_API_PREFIX = "ba-"
-
-# Lower rank wins. First-party official APIs beat the licensed general
-# catalog; helloao is the open/public-domain fallback; community mirrors
-# (bible-api.com, and Bolls if it were ever added) are last resort.
-# Bolls is not a source: no licence grant, and its popular CJK texts are
-# either copyrighted or unusable flattened furigana.
-SOURCE_TRUST: dict[Source, int] = {
-    "esv": 0,
-    "api_bible": 1,
-    "helloao": 2,
-    "bible_api": 3,
-}
-
 
 @dataclass(frozen=True)
 class Translation:
@@ -162,11 +149,7 @@ def _for_deployment(entry: Translation, settings: Settings) -> Translation:
 
 
 def _source_available(source: Source, settings: Settings) -> bool:
-    if source == "esv":
-        return bool(settings.esv_api_key)
-    if source == "api_bible":
-        return bool(settings.api_bible_key)
-    return True  # bible-api.com and helloao need no credentials
+    return SOURCES[source].configured(settings)
 
 
 def _is_configured(translation: Translation, settings: Settings) -> bool:

@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 from ...schemas import Paragraph, Segment, Verse
+from ..base import drop_orphan_headings, trim_verses  # noqa: F401  (re-exported)
 
 HEADING_STYLE = re.compile(r"^(s\d?|ms\d?|mr|r|d)$")
 ITALIC_STYLES = {"add", "qt", "em"}
@@ -74,72 +75,6 @@ def _walk(items: list[dict[str, Any]] | None, para: Paragraph, *, wj: bool, ital
                 )
             else:
                 _walk(item.get("items"), para, wj=wj, italic=italic)
-
-
-def trim_verses(
-    paragraphs: list[Paragraph],
-    *,
-    first: int | None = None,
-    last: int | None = None,
-) -> list[Paragraph]:
-    """Drop verses outside [first, last]; used on the end chapters of a range.
-
-    Unnumbered runs (common in CSB poetry: each `qc`/`q*` line is its own
-    paragraph with no verse tag) continue the most recent numbered verse, so
-    retention must carry across paragraph boundaries — not only within one
-    paragraph after a numbered sibling.
-    """
-    if first is None and last is None:
-        return paragraphs
-
-    kept_paragraphs: list[Paragraph] = []
-    # True while the last numbered verse we saw was inside the keep window.
-    keep_continuations = False
-
-    for para in paragraphs:
-        if para.kind != "text":
-            kept_paragraphs.append(para)
-            continue
-
-        kept: list[Verse] = []
-        for verse in para.verses:
-            number = int(verse.number) if verse.number and verse.number.isdigit() else None
-            if number is None:
-                if keep_continuations:
-                    kept.append(verse)
-                continue
-            in_range = (first is None or number >= first) and (
-                last is None or number <= last
-            )
-            keep_continuations = in_range
-            if in_range:
-                kept.append(verse)
-
-        if kept:
-            para.verses = kept
-            kept_paragraphs.append(para)
-
-    return drop_orphan_headings(kept_paragraphs)
-
-
-def drop_orphan_headings(paragraphs: list[Paragraph]) -> list[Paragraph]:
-    """Remove headings left with no scripture under them after trimming."""
-    out: list[Paragraph] = []
-
-    for index, para in enumerate(paragraphs):
-        if para.kind == "heading":
-            has_text = False
-            for later in paragraphs[index + 1 :]:
-                if later.kind == "heading":
-                    break
-                if later.kind == "text" and later.verses:
-                    has_text = True
-                    break
-            if not has_text:
-                continue
-        out.append(para)
-
-    return out
 
 
 def parse_content(content: list[dict[str, Any]] | None) -> list[Paragraph]:

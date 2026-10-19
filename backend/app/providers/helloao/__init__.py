@@ -1,6 +1,6 @@
-"""Free Use Bible API (bible.helloao.org) provider."""
+"""Free Use Bible API (bible.helloao.org) chapter source."""
 
 from .client import HelloAoClient
-from .provider import HelloAoProvider
+from .provider import HelloAoSource
 
-__all__ = ["HelloAoClient", "HelloAoProvider"]
+__all__ = ["HelloAoClient", "HelloAoSource"]

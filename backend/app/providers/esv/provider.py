@@ -2,19 +2,14 @@
 
 Crossway serves passage text only, so book/chapter/verse structure comes from
 the static canon. Their licence caps how much may be shown at once; that is
-enforced in the router, which knows the requested size before fetching.
+enforced in the router, which knows the requested size before fetching. Their
+terms also forbid storing the text, so the source registry gives the ESV no
+cache: every chapter is fetched for the request that shows it.
 """
 
 from ...canon import BOOK_NAMES
-from ...schemas import Book, Passage
-from ..base import (
-    build_reference,
-    canonical_books,
-    canonical_verse_numbers,
-    fetch_chapters,
-    partial_bounds,
-    with_chapter_markers,
-)
+from ...schemas import Book
+from ..base import ChapterText, canonical_books
 from .client import EsvClient
 from .parser import parse_esv_html
 
@@ -31,35 +26,20 @@ ESV_COPYRIGHT = (
 ESV_ATTRIBUTION = "https://www.esv.org"
 
 
-class EsvProvider:
+class EsvSource:
+    max_concurrency = MAX_CONCURRENT_CHAPTERS
+    attribution = ESV_ATTRIBUTION
+    canonical_structure = True
+
     def __init__(self, client: EsvClient) -> None:
         self._client = client
 
     async def list_books(self) -> list[Book]:
         return canonical_books()
 
-    async def list_verse_numbers(self, book_id: str, chapter: str) -> list[str]:
-        return canonical_verse_numbers(book_id, chapter)
-
-    async def get_passage(
-        self, book_id: str, start_chapter: int, start_verse: int, end_chapter: int, end_verse: int
-    ) -> Passage:
+    async def fetch_chapter(self, book_id: str, chapter: int) -> ChapterText:
         name = BOOK_NAMES.get(book_id, book_id)
-        chapters = list(range(start_chapter, end_chapter + 1))
-
-        async def fetch(index: int, number: int) -> str:
-            first, last = partial_bounds(index, len(chapters), start_verse, end_verse)
-            # Crossway wants an explicit range; 999 asks for "to the end".
-            query = f"{name} {number}:{first or 1}-{number}:{last or 999}"
-            return await self._client.passage_html(query)
-
-        results = await fetch_chapters(chapters, fetch, limit=MAX_CONCURRENT_CHAPTERS)
-
-        return Passage(
-            reference=build_reference(book_id, start_chapter, start_verse, end_chapter, end_verse),
-            copyright=ESV_COPYRIGHT,
-            attribution=ESV_ATTRIBUTION,
-            paragraphs=with_chapter_markers(
-                chapters, [parse_esv_html(html) for html in results]
-            ),
-        )
+        # Crossway wants an explicit range; 999 asks for "to the end". A bare
+        # "Jude 1" would be read as a verse of a one-chapter book.
+        html = await self._client.passage_html(f"{name} {chapter}:1-{chapter}:999")
+        return ChapterText(paragraphs=parse_esv_html(html), copyright=ESV_COPYRIGHT)

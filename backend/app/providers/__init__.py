@@ -1,19 +1,21 @@
-"""Provider registry: resolves a translation id to something that can fetch it."""
+"""One chapter source per upstream; `app.sources` says which serves what."""
 
-from .api_bible import ApiBibleClient, ApiBibleProvider
-from .base import PassageProvider
-from .bible_api import BibleApiClient, BibleApiProvider
-from .esv import EsvClient, EsvProvider
-from .helloao import HelloAoClient, HelloAoProvider
+from .api_bible import ApiBibleClient, ApiBibleSource
+from .base import ChapterSource, ChapterText, PassageProvider
+from .bible_api import BibleApiClient, BibleApiSource
+from .esv import EsvClient, EsvSource
+from .helloao import HelloAoClient, HelloAoSource
 
 __all__ = [
     "ApiBibleClient",
-    "ApiBibleProvider",
+    "ApiBibleSource",
     "BibleApiClient",
-    "BibleApiProvider",
+    "ChapterSource",
+    "ChapterText",
+    "BibleApiSource",
     "EsvClient",
-    "EsvProvider",
+    "EsvSource",
     "HelloAoClient",
-    "HelloAoProvider",
+    "HelloAoSource",
     "PassageProvider",
 ]

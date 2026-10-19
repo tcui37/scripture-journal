@@ -7,22 +7,18 @@ with no headings, poetry or red letter, so passages render as plain prose.
 from typing import Any
 
 from ...canon import BOOK_NAMES
-from ...schemas import Book, Paragraph, Passage, Segment, Verse
-from ..base import (
-    build_reference,
-    canonical_books,
-    canonical_verse_numbers,
-    chapter_verse_count,
-    fetch_chapters,
-    partial_bounds,
-    with_chapter_markers,
-)
+from ...schemas import Book, Paragraph, Segment, Verse
+from ..base import ChapterText, canonical_books, chapter_verse_count
 from .client import BibleApiClient
 
 MAX_CONCURRENT_CHAPTERS = 4
 
 
-class BibleApiProvider:
+class BibleApiSource:
+    max_concurrency = MAX_CONCURRENT_CHAPTERS
+    attribution = ""
+    canonical_structure = True
+
     def __init__(
         self, client: BibleApiClient, translation_id: str, *, new_testament_only: bool = False
     ) -> None:
@@ -33,31 +29,15 @@ class BibleApiProvider:
     async def list_books(self) -> list[Book]:
         return canonical_books(new_testament_only=self._new_testament_only)
 
-    async def list_verse_numbers(self, book_id: str, chapter: str) -> list[str]:
-        return canonical_verse_numbers(book_id, chapter)
-
-    async def get_passage(
-        self, book_id: str, start_chapter: int, start_verse: int, end_chapter: int, end_verse: int
-    ) -> Passage:
+    async def fetch_chapter(self, book_id: str, chapter: int) -> ChapterText:
         name = BOOK_NAMES.get(book_id, book_id)
-        chapters = list(range(start_chapter, end_chapter + 1))
-
-        async def fetch(index: int, number: int) -> dict[str, Any]:
-            first, last = partial_bounds(index, len(chapters), start_verse, end_verse)
-            # This upstream 404s on an end verse the chapter does not have, so
-            # an open-ended chapter is closed on its real last verse — or asked
-            # for whole, when the canon does not cover the book.
-            end = last or chapter_verse_count(book_id, str(number))
-            reference = f"{name} {number}:{first or 1}-{end}" if end else f"{name} {number}"
-            return await self._client.passage(reference, self._translation_id)
-
-        results = await fetch_chapters(chapters, fetch, limit=MAX_CONCURRENT_CHAPTERS)
-
-        return Passage(
-            reference=build_reference(book_id, start_chapter, start_verse, end_chapter, end_verse),
-            copyright=(results[0] if results else {}).get("translation_name") or "",
-            paragraphs=with_chapter_markers(chapters, [_prose(data) for data in results]),
-        )
+        # This upstream 404s on an end verse the chapter does not have, so the
+        # chapter is closed on its real last verse — or asked for whole, when
+        # the canon does not cover the book.
+        end = chapter_verse_count(book_id, str(chapter))
+        reference = f"{name} {chapter}:1-{end}" if end else f"{name} {chapter}"
+        data = await self._client.passage(reference, self._translation_id)
+        return ChapterText(paragraphs=_prose(data), copyright=data.get("translation_name") or "")
 
 
 def _prose(data: dict[str, Any]) -> list[Paragraph]:

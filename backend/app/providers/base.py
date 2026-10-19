@@ -1,19 +1,45 @@
 """What every translation source must be able to do.
 
-Alongside the protocol, this holds the parts of fetching a passage that do not
-depend on which upstream is answering: pacing one request per chapter, marking
-chapter boundaries, and naming the range.
+A source only knows how to list its books and fetch one whole chapter;
+`app.passages` turns that into verse ranges, caching chapters along the way.
+Alongside the protocols, this holds the parts of building a passage that do
+not depend on which upstream is answering: pacing one request per chapter,
+trimming the ends of a range, marking chapter boundaries, naming the range.
 """
 
 import asyncio
 from collections.abc import Awaitable, Callable, Iterable, Sequence
-from typing import Protocol, TypeVar
+from typing import ClassVar, Protocol, TypeVar
+
+from pydantic import BaseModel
 
 from ..canon import BOOK_NAMES, BOOK_ORDER, is_new_testament
-from ..schemas import Book, Chapter, Paragraph, Passage
+from ..schemas import Book, Chapter, Paragraph, Passage, Verse
 from ..versification import VERSE_COUNTS
 
 T = TypeVar("T")
+
+
+class ChapterText(BaseModel):
+    """One whole chapter, parsed — the unit every source fetches and caches."""
+
+    paragraphs: list[Paragraph]
+    #: The publisher's notice as the upstream reports it, if it does.
+    copyright: str = ""
+
+
+class ChapterSource(Protocol):
+    #: Chapters fetched at once for a range; each upstream sets its own pace.
+    max_concurrency: ClassVar[int]
+    #: Attribution the licence requires on every page, or "".
+    attribution: ClassVar[str]
+    #: True when book and verse structure comes from the static canon, so
+    #: listing verses costs no request; otherwise it is read off the chapter.
+    canonical_structure: ClassVar[bool]
+
+    async def list_books(self) -> list[Book]: ...
+
+    async def fetch_chapter(self, book_id: str, chapter: int) -> ChapterText: ...
 
 
 class PassageProvider(Protocol):
@@ -129,3 +155,79 @@ def build_reference(book_id: str, sc: int, sv: int, ec: int, ev: int) -> str:
     if sc == ec:
         return f"{name} {sc}:{sv}" + (f"–{ev}" if ev != sv else "")
     return f"{name} {sc}:{sv}–{ec}:{ev}"
+
+
+def trim_verses(
+    paragraphs: list[Paragraph],
+    *,
+    first: int | None = None,
+    last: int | None = None,
+) -> list[Paragraph]:
+    """Drop verses outside [first, last]; used on the end chapters of a range.
+
+    Unnumbered runs (common in CSB poetry: each `qc`/`q*` line is its own
+    paragraph with no verse tag) continue the most recent numbered verse, so
+    retention must carry across paragraph boundaries — not only within one
+    paragraph after a numbered sibling.
+    """
+    if first is None and last is None:
+        return paragraphs
+
+    kept_paragraphs: list[Paragraph] = []
+    # True while the last numbered verse we saw was inside the keep window.
+    keep_continuations = False
+
+    for para in paragraphs:
+        if para.kind != "text":
+            kept_paragraphs.append(para)
+            continue
+
+        kept: list[Verse] = []
+        for verse in para.verses:
+            number = int(verse.number) if verse.number and verse.number.isdigit() else None
+            if number is None:
+                if keep_continuations:
+                    kept.append(verse)
+                continue
+            in_range = (first is None or number >= first) and (
+                last is None or number <= last
+            )
+            keep_continuations = in_range
+            if in_range:
+                kept.append(verse)
+
+        if kept:
+            para.verses = kept
+            kept_paragraphs.append(para)
+
+    return drop_orphan_headings(kept_paragraphs)
+
+
+def drop_orphan_headings(paragraphs: list[Paragraph]) -> list[Paragraph]:
+    """Remove headings left with no scripture under them after trimming."""
+    out: list[Paragraph] = []
+
+    for index, para in enumerate(paragraphs):
+        if para.kind == "heading":
+            has_text = False
+            for later in paragraphs[index + 1 :]:
+                if later.kind == "heading":
+                    break
+                if later.kind == "text" and later.verses:
+                    has_text = True
+                    break
+            if not has_text:
+                continue
+        out.append(para)
+
+    return out
+
+
+def verse_numbers(paragraphs: list[Paragraph]) -> list[str]:
+    """The numbered verses of a chapter, in order, each once."""
+    seen: dict[str, None] = {}
+    for para in paragraphs:
+        for verse in para.verses:
+            if verse.number and verse.number.isdigit():
+                seen.setdefault(verse.number, None)
+    return list(seen)

@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .cache import Store
 from .catalog import Catalog
 from .clients import Clients
 from .config import get_settings
+from .persistence.scripture_cache import SupabaseCache
 from .routers import auth, bible, designs, files
 
 
@@ -16,6 +18,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     clients = Clients.build(settings)
 
     app.state.clients = clients
+    persistent = (
+        SupabaseCache(
+            url=settings.supabase_url,
+            service_key=settings.supabase_service_role_key,
+            timeout=settings.request_timeout,
+        )
+        if settings.supabase_url and settings.supabase_service_role_key
+        else None
+    )
+    app.state.store = Store(persistent)
     app.state.catalog = Catalog(settings, clients.helloao, clients.api_bible)
 
     try:
@@ -24,6 +36,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Closed in a finally so a failure during startup or serving still
         # releases the connection pools.
         await clients.aclose()
+        if persistent is not None:
+            await persistent.aclose()
 
 
 app = FastAPI(

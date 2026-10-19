@@ -1,8 +1,8 @@
 """Passage assembly: fan-out, partial ends, and chapter markers.
 
-`get_passage` is the same shape for every provider — fetch each chapter of the
-range concurrently, trim only the two ends, and mark boundaries when there is
-more than one chapter. These exercise that shared machinery against a stub
+`Passages.get_passage` is the same for every source — fetch each chapter of
+the range concurrently, trim only the two ends, and mark boundaries when there
+is more than one chapter. These exercise that shared machinery against a stub
 client, so no upstream is called and no quota is spent.
 """
 
@@ -18,10 +18,16 @@ from app.providers.base import (
     partial_bounds,
     with_chapter_markers,
 )
-from app.providers.bible_api.provider import BibleApiProvider
-from app.providers.esv.provider import EsvProvider
-from app.providers.helloao.provider import HelloAoProvider
+from app.cache import Store
+from app.passages import Passages
+from app.providers.bible_api.provider import BibleApiSource
+from app.providers.esv.provider import EsvSource
+from app.providers.helloao.provider import HelloAoSource
 from app.schemas import Paragraph
+
+
+def passages(source, ttl: float | None = None) -> Passages:
+    return Passages(source, Store(), namespace="test", ttl=ttl)
 
 # ── the shared helpers ────────────────────────────────────────────────────
 
@@ -140,7 +146,7 @@ async def test_helloao_keeps_cjk_book_names():
                 ]
             }
 
-    books = await HelloAoProvider(BooksHelloAo(), "cmn_cuv").list_books()  # type: ignore[arg-type]
+    books = await passages(HelloAoSource(BooksHelloAo(), "cmn_cuv")).list_books()  # type: ignore[arg-type]
     by_id = {book.id: book.name for book in books}
     assert by_id["JHN"] == "約翰福音"
     assert by_id["MAT"] == "Matthew"
@@ -176,7 +182,7 @@ class StubHelloAo:
 @pytest.mark.asyncio
 async def test_multi_chapter_range_trims_only_its_ends():
     client = StubHelloAo()
-    provider = HelloAoProvider(client, "STUB")  # type: ignore[arg-type]
+    provider = passages(HelloAoSource(client, "STUB"))  # type: ignore[arg-type]
 
     # Chapters 1-3, from 1:3 to 3:2 — so 1:3-5, all of 2, then 3:1-2.
     passage = await provider.get_passage("JHN", 1, 3, 3, 2)
@@ -197,7 +203,7 @@ async def test_multi_chapter_range_trims_only_its_ends():
 
 @pytest.mark.asyncio
 async def test_single_chapter_range_has_no_marker():
-    provider = HelloAoProvider(StubHelloAo(), "STUB")  # type: ignore[arg-type]
+    provider = passages(HelloAoSource(StubHelloAo(), "STUB"))  # type: ignore[arg-type]
     passage = await provider.get_passage("JHN", 2, 2, 2, 4)
 
     assert not [p for p in passage.paragraphs if p.kind == "chapter"]
@@ -233,29 +239,30 @@ async def test_bible_api_closes_open_ranges_on_the_real_last_verse():
     ends at 51, John 2 at 25.
     """
     client = StubBibleApi()
-    provider = BibleApiProvider(client, "bbe")  # type: ignore[arg-type]
+    provider = passages(BibleApiSource(client, "bbe"))  # type: ignore[arg-type]
 
     await provider.get_passage("JHN", 1, 1, 3, 4)
 
-    assert client.references == ["John 1:1-51", "John 2:1-25", "John 3:1-4"]
+    assert client.references == ["John 1:1-51", "John 2:1-25", "John 3:1-36"]
     assert not any("999" in reference for reference in client.references)
 
 
 @pytest.mark.asyncio
-async def test_bible_api_single_chapter_uses_the_requested_bounds():
+async def test_bible_api_fetches_whole_chapters_for_partial_ranges():
+    """Whole chapters are the cached unit; the range is trimmed locally."""
     client = StubBibleApi()
-    provider = BibleApiProvider(client, "bbe")  # type: ignore[arg-type]
+    provider = passages(BibleApiSource(client, "bbe"))  # type: ignore[arg-type]
 
     await provider.get_passage("JHN", 3, 16, 3, 17)
 
-    assert client.references == ["John 3:16-17"]
+    assert client.references == ["John 3:1-36"]
 
 
 @pytest.mark.asyncio
 async def test_bible_api_asks_for_a_whole_chapter_outside_the_canon():
     """With no verse count to close on, the whole chapter is requested."""
     client = StubBibleApi()
-    provider = BibleApiProvider(client, "bbe")  # type: ignore[arg-type]
+    provider = passages(BibleApiSource(client, "bbe"))  # type: ignore[arg-type]
 
     await provider.get_passage("TOB", 1, 1, 2, 3)
 
@@ -284,8 +291,68 @@ async def test_esv_open_chapters_use_the_999_sentinel():
     have. Copying that close-on-canon behaviour here would be a silent miss.
     """
     client = StubEsv()
-    provider = EsvProvider(client)  # type: ignore[arg-type]
+    provider = passages(EsvSource(client))  # type: ignore[arg-type]
 
     await provider.get_passage("JHN", 1, 1, 3, 4)
 
-    assert client.queries == ["John 1:1-1:999", "John 2:1-2:999", "John 3:1-3:4"]
+    assert client.queries == ["John 1:1-1:999", "John 2:1-2:999", "John 3:1-3:999"]
+
+
+# ── caching across ranges ─────────────────────────────────────────────────
+
+
+def body(passage) -> str:
+    return " ".join(
+        "".join(s.text for s in verse.segments)
+        for para in passage.paragraphs
+        for verse in para.verses
+    )
+
+
+@pytest.mark.asyncio
+async def test_cached_chapter_serves_every_range_inside_it():
+    client = StubHelloAo()
+    provider = passages(HelloAoSource(client, "STUB"), ttl=60)  # type: ignore[arg-type]
+
+    assert body(await provider.get_passage("JHN", 2, 2, 2, 3)) == "c2v2. c2v3."
+    # Trimming the first passage must not have edited the cached chapter.
+    assert body(await provider.get_passage("JHN", 2, 1, 2, 5)) == (
+        "c2v1. c2v2. c2v3. c2v4. c2v5."
+    )
+    assert await provider.list_verse_numbers("JHN", "2") == ["1", "2", "3", "4", "5"]
+    assert client.paths == ["/STUB/JHN/2.json"]
+
+
+@pytest.mark.asyncio
+async def test_uncached_source_refetches_every_time():
+    """The ESV has no TTL: nothing is kept between requests."""
+    client = StubEsv()
+    provider = passages(EsvSource(client), ttl=None)  # type: ignore[arg-type]
+
+    await provider.get_passage("JHN", 3, 16, 3, 17)
+    await provider.get_passage("JHN", 3, 16, 3, 17)
+
+    assert client.queries == ["John 3:1-3:999", "John 3:1-3:999"]
+
+
+@pytest.mark.asyncio
+async def test_canonical_sources_list_verses_without_a_request():
+    client = StubEsv()
+    provider = passages(EsvSource(client))  # type: ignore[arg-type]
+
+    assert len(await provider.list_verse_numbers("JHN", "3")) == 36
+    assert client.queries == []
+
+
+@pytest.mark.asyncio
+async def test_concurrent_readers_share_one_request():
+    client = StubHelloAo()
+    store = Store()
+    first = Passages(HelloAoSource(client, "STUB"), store, namespace="n", ttl=60)  # type: ignore[arg-type]
+    second = Passages(HelloAoSource(client, "STUB"), store, namespace="n", ttl=60)  # type: ignore[arg-type]
+
+    await asyncio.gather(
+        first.get_passage("JHN", 1, 1, 1, 5), second.get_passage("JHN", 1, 2, 1, 3)
+    )
+
+    assert client.paths == ["/STUB/JHN/1.json"]

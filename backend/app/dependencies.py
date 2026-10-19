@@ -1,16 +1,13 @@
-from typing import Annotated, TypeVar
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 
+from .cache import Store
 from .catalog import Catalog, Translation
 from .clients import Clients
-from .providers import (
-    ApiBibleProvider,
-    BibleApiProvider,
-    EsvProvider,
-    HelloAoProvider,
-    PassageProvider,
-)
+from .passages import Passages
+from .providers import PassageProvider
+from .sources import SOURCES
 
 
 def get_catalog(request: Request) -> Catalog:
@@ -39,35 +36,32 @@ def get_clients(request: Request) -> Clients:
 
 ClientsDep = Annotated[Clients, Depends(get_clients)]
 
-_Client = TypeVar("_Client")
+def get_store(request: Request) -> Store:
+    return request.app.state.store
 
 
-def _configured(client: _Client | None, source: str) -> _Client:
-    """A translation is only listed when its client exists, so this should be
-    unreachable — but say which upstream is missing rather than raise a
-    KeyError if the catalogue and the clients ever disagree."""
+StoreDep = Annotated[Store, Depends(get_store)]
+
+
+def get_provider(
+    translation: TranslationDep, clients: ClientsDep, store: StoreDep
+) -> PassageProvider:
+    """Passages for this translation, from whichever source serves it."""
+    spec = SOURCES[translation.source]
+    client = clients.get(translation.source)
     if client is None:
+        # A translation is only listed when its client exists, so this should
+        # be unreachable — but say which upstream is missing if the catalogue
+        # and the clients ever disagree.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"{source} is not configured on this server.",
+            detail=f"{spec.label} is not configured on this server.",
         )
-    return client
-
-
-def get_provider(translation: TranslationDep, clients: ClientsDep) -> PassageProvider:
-    """The client that can actually fetch this translation."""
-    if translation.source == "api_bible":
-        return ApiBibleProvider(
-            _configured(clients.api_bible, "api.bible"), translation.upstream_id
-        )
-    if translation.source == "esv":
-        return EsvProvider(_configured(clients.esv, "The ESV API"))
-    if translation.source == "helloao":
-        return HelloAoProvider(clients.helloao, translation.upstream_id)
-    return BibleApiProvider(
-        clients.bible_api,
-        translation.upstream_id,
-        new_testament_only=translation.new_testament_only,
+    return Passages(
+        spec.open(client, translation.upstream_id, translation.new_testament_only),
+        store,
+        namespace=f"{translation.source}:{translation.upstream_id}",
+        ttl=spec.cache_ttl,
     )
 
 

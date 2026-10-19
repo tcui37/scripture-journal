@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     #: Backend-only. The browser never talks to Supabase.
     supabase_url: str = ""
     supabase_anon_key: str = ""
+    #: Lets the API share fetched chapters across instances (the
+    #: `scripture_cache` table). Without it, chapters are cached per process.
+    supabase_service_role_key: str = ""
 
     #: True when this instance serves only the person running it.
     #:

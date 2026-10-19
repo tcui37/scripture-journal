@@ -1,6 +1,6 @@
-"""bible-api.com provider."""
+"""bible-api.com chapter source."""
 
 from .client import BibleApiClient
-from .provider import BibleApiProvider
+from .provider import BibleApiSource
 
-__all__ = ["BibleApiClient", "BibleApiProvider"]
+__all__ = ["BibleApiClient", "BibleApiSource"]

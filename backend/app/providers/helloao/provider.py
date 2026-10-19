@@ -8,20 +8,18 @@ strings and `{"text": …, "poem": 1}` fragments for poetry.
 from typing import Any
 
 from ...canon import has_cjk, short_name
-from ...schemas import Book, Chapter, Paragraph, Passage, Segment, Verse
-from ..base import (
-    build_reference,
-    chapter_verse_count,
-    fetch_chapters,
-    partial_bounds,
-    with_chapter_markers,
-)
+from ...schemas import Book, Chapter, Paragraph, Segment, Verse
+from ..base import ChapterText, chapter_verse_count
 from .client import HelloAoClient
 
 MAX_CONCURRENT_CHAPTERS = 8
 
 
-class HelloAoProvider:
+class HelloAoSource:
+    max_concurrency = MAX_CONCURRENT_CHAPTERS
+    attribution = ""
+    canonical_structure = False
+
     def __init__(self, client: HelloAoClient, translation_id: str) -> None:
         self._client = client
         self._translation_id = translation_id
@@ -39,36 +37,13 @@ class HelloAoProvider:
             for book in data.get("books") or []
         ]
 
-    async def list_verse_numbers(self, book_id: str, chapter: str) -> list[str]:
+    async def fetch_chapter(self, book_id: str, chapter: int) -> ChapterText:
         data = await self._client.get(f"/{self._translation_id}/{book_id}/{chapter}.json")
-        return [
-            str(item["number"])
-            for item in (data.get("chapter") or {}).get("content") or []
-            if item.get("type") == "verse" and item.get("number") is not None
-        ]
-
-    async def get_passage(
-        self, book_id: str, start_chapter: int, start_verse: int, end_chapter: int, end_verse: int
-    ) -> Passage:
-        chapters = list(range(start_chapter, end_chapter + 1))
-
-        async def fetch(index: int, number: int) -> dict[str, Any]:
-            return await self._client.get(f"/{self._translation_id}/{book_id}/{number}.json")
-
-        results = await fetch_chapters(chapters, fetch, limit=MAX_CONCURRENT_CHAPTERS)
-
-        parsed = []
-        for index, data in enumerate(results):
-            first, last = partial_bounds(index, len(chapters), start_verse, end_verse)
-            content = (data.get("chapter") or {}).get("content") or []
-            parsed.append(_parse_chapter(content, first=first, last=last))
-
-        translation = (results[0].get("translation") or {}) if results else {}
-
-        return Passage(
-            reference=build_reference(book_id, start_chapter, start_verse, end_chapter, end_verse),
+        content = (data.get("chapter") or {}).get("content") or []
+        translation = data.get("translation") or {}
+        return ChapterText(
+            paragraphs=_parse_chapter(content, first=None, last=None),
             copyright=translation.get("licenseUrl") or translation.get("name") or "",
-            paragraphs=with_chapter_markers(chapters, parsed),
         )
 
 

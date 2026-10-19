@@ -1,6 +1,6 @@
-"""Crossway ESV provider."""
+"""Crossway ESV chapter source."""
 
 from .client import EsvClient
-from .provider import ESV_COPYRIGHT, EsvProvider
+from .provider import ESV_COPYRIGHT, EsvSource
 
-__all__ = ["ESV_COPYRIGHT", "EsvClient", "EsvProvider"]
+__all__ = ["ESV_COPYRIGHT", "EsvClient", "EsvSource"]
