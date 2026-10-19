@@ -1,9 +1,8 @@
 /**
- * Mirrors the licence caps enforced in backend/app/usage_limits.py.
- *
- * Duplicated deliberately: the server is the authority, but the UI needs to
- * know before it asks, so it can warn and disable the download rather than
- * only reporting a rejected request.
+ * The licence caps, as the server reports them (backend/app/usage_limits.py
+ * is the one place the rules live). The UI checks a selection before asking,
+ * so it can warn and disable the download rather than only reporting a
+ * rejected request.
  */
 
 import type { BibleSummary, Book, Reference } from "./types";
@@ -36,22 +35,18 @@ export function versesInRange(book: Book | undefined, reference: Reference): num
   return total;
 }
 
-/** Largest number of verses of `book` this translation's licence allows. */
+/**
+ * Largest number of verses of `book` this translation's licence allows.
+ *
+ * The server works the licence rules out per book (`limits.allowances`), so
+ * the half-book and single-chapter rules live only in usage_limits.py. A book
+ * it holds no verse counts for is capped at the flat `max_verses`.
+ */
 export function allowance(bible: BibleSummary | undefined, book: Book | undefined): number | null {
   const limits = bible?.limits;
   if (!limits || !book) return null;
-  if (limits.exempt_single_chapter_books && book.chapters.length === 1) return null;
-
-  const caps: number[] = [];
-  if (limits.max_verses != null) caps.push(limits.max_verses);
-  if (limits.max_book_fraction != null) {
-    const total = book.chapters.reduce((sum, chapter) => sum + chapter.verse_count, 0);
-    // A total of zero means the verse counts are unknown for this book, not
-    // that it is empty — deriving a cap from it would produce 0 and grey out
-    // the download for every selection.
-    if (total > 0) caps.push(Math.floor(total * limits.max_book_fraction));
-  }
-  return caps.length ? Math.min(...caps) : null;
+  if (book.id in limits.allowances) return limits.allowances[book.id];
+  return limits.max_verses;
 }
 
 export function checkLimits(

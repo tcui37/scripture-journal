@@ -12,7 +12,7 @@ from app.catalog import Translation
 from app.dependencies import get_catalog, get_provider
 from app.routers import bible
 from app.schemas import Passage
-from app.usage_limits import API_BIBLE_PRINT_LIMITS, NO_LIMITS
+from app.usage_limits import API_BIBLE_PRINT_LIMITS, ESV_LIMITS, NO_LIMITS
 
 NIV = Translation(
     "niv",
@@ -136,3 +136,18 @@ def test_unknown_translation_is_404():
     assert response.status_code == 404
     assert "nope" in response.json()["detail"]
     assert provider.calls == []
+
+
+def test_capped_translations_carry_per_book_allowances():
+    from app.routers.bible import _summary
+
+    esv = _summary(Translation("esv", "ESV", "esv", limits=ESV_LIMITS))
+    assert esv.limits is not None
+    assert esv.limits.allowances["RUT"] == 42  # half of 85 verses
+    assert esv.limits.allowances["PSA"] == 500
+    assert esv.limits.allowances["JUD"] is None  # single-chapter book, exempt
+
+    niv = _summary(Translation("niv", "NIV", "api_bible", "x", limits=API_BIBLE_PRINT_LIMITS))
+    assert niv.limits is not None and niv.limits.allowances["JUD"] == 100
+
+    assert _summary(Translation("kjv", "KJV", "helloao", "x", limits=NO_LIMITS)).limits is None

@@ -35,6 +35,7 @@ const NIV = bible("niv", "NIV — New International Version", {
   max_book_fraction: null,
   exempt_single_chapter_books: false,
   note: API_BIBLE_NOTE,
+  allowances: {},
 });
 
 const NASB = bible("nasb", "NASB — New American Standard Bible 1995", {
@@ -42,6 +43,7 @@ const NASB = bible("nasb", "NASB — New American Standard Bible 1995", {
   max_book_fraction: null,
   exempt_single_chapter_books: false,
   note: API_BIBLE_NOTE,
+  allowances: {},
 });
 
 const ESV = bible("esv", "ESV — English Standard Version", {
@@ -49,6 +51,8 @@ const ESV = bible("esv", "ESV — English Standard Version", {
   max_book_fraction: 0.5,
   exempt_single_chapter_books: true,
   note: ESV_NOTE,
+  // As the server computes them for the fixture books below.
+  allowances: { JHN: 56, PSA: 500, JUD: null },
 });
 
 const KJV = bible("kjv", "KJV — King James Version", null);
@@ -196,6 +200,7 @@ describe("explanationFor", () => {
       max_book_fraction: null,
       exempt_single_chapter_books: false,
       note: "Publisher allows 40 verses.",
+      allowances: {},
     });
     const copy = explanationFor(odd, 40);
     assert.equal(copy.source, "");

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from ..dependencies import CatalogDep, ProviderDep, TranslationDep
 from ..schemas import BibleLimits, BibleSummary, Book, LanguageSummary, Passage
 from ..usage_limits import allowance
-from ..versification import verses_in_range
+from ..versification import VERSE_COUNTS, verses_in_range
 
 router = APIRouter(prefix="/api", tags=["bible"])
 
@@ -31,6 +31,7 @@ def _summary(translation) -> BibleSummary:  # type: ignore[no-untyped-def]
             max_book_fraction=limits.max_book_fraction,
             exempt_single_chapter_books=limits.exempt_single_chapter_books,
             note=limits.note,
+            allowances={book_id: allowance(limits, book_id) for book_id in VERSE_COUNTS},
         ),
     )
 

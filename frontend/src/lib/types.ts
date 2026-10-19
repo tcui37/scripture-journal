@@ -1,65 +1,19 @@
-/** Mirrors the Pydantic models in backend/app/schemas.py. */
+import type { components } from "./api-schema";
 
-export interface BibleLimits {
-  max_verses: number | null;
-  max_book_fraction: number | null;
-  exempt_single_chapter_books: boolean;
-  note: string;
-}
-
-export interface BibleSummary {
-  id: string;
-  label: string;
-  language: string;
-  language_name: string;
-  limits: BibleLimits | null;
-}
-
-export interface LanguageSummary {
-  code: string;
-  name: string;
-  count: number;
-}
-
-export interface Chapter {
-  number: string;
-  /** Verses in this chapter; used to size a selection before requesting it. */
-  verse_count: number;
-}
-
-export interface Book {
-  id: string;
-  name: string;
-  chapters: Chapter[];
-}
-
-export interface Segment {
-  text: string;
-  wj: boolean;
-  italic: boolean;
-}
-
-export interface Verse {
-  number: string | null;
-  segments: Segment[];
-}
-
-export interface Paragraph {
-  /** "chapter" marks a chapter boundary within a multi-chapter passage. */
-  kind: "heading" | "text" | "chapter";
-  style: string;
-  heading: string;
-  verses: Verse[];
-}
-
-export interface Passage {
-  reference: string;
-  /** The publisher's copyright notice for this translation. */
-  copyright: string;
-  /** Provider attribution the licence requires on the page, if any. */
-  attribution: string;
-  paragraphs: Paragraph[];
-}
+/**
+ * API shapes, generated from the backend's OpenAPI schema — regenerate with
+ * `npm run gen:types` after changing backend/app/schemas.py.
+ */
+type Schemas = components["schemas"];
+export type BibleLimits = Schemas["BibleLimits"];
+export type BibleSummary = Schemas["BibleSummary"];
+export type LanguageSummary = Schemas["LanguageSummary"];
+export type Chapter = Schemas["Chapter"];
+export type Book = Schemas["Book"];
+export type Segment = Schemas["Segment"];
+export type Verse = Schemas["Verse"];
+export type Paragraph = Schemas["Paragraph"];
+export type Passage = Schemas["Passage"];
 
 export type Layout = "right" | "bottom" | "twocol" | "verso" | "wide";
 export type LineStyle = "ruled" | "dots" | "blank" | "none";
