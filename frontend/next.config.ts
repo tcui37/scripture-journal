@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   // Next's "workspace root", and `next build` looks for `app/` in the wrong
   // place — that is what broke the Vercel production build.
   outputFileTracingRoot: here,
+  // Browser tests run their own dev server beside yours; separate build
+  // folders keep the two from corrupting each other's cache.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   async rewrites() {
     // Browser calls stay same-origin; only /api/:path* is proxied (so
     // /api/health warms the Python function, while /health on this origin is 404).

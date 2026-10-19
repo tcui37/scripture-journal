@@ -1,50 +1,36 @@
-import { fetchPassage } from "./api";
+/**
+ * Passages for code outside React (library page counts), from the same
+ * TanStack Query cache the preview uses — one fetch per bible and range.
+ */
+
+import { passageQuery, queryClient } from "./queries";
 import type { Passage, Reference } from "./types";
 
-/** Stable cache key for a bible + reference range. */
-export function passageCacheKey(bibleId: string, reference: Reference): string {
-  const { bookId, startChapter, startVerse, endChapter, endVerse } = reference;
-  return `${bibleId}|${bookId}|${startChapter}:${startVerse}-${endChapter}:${endVerse}`;
-}
-
-const cache = new Map<string, Passage>();
-
-/** In-flight deduplication — concurrent requests for the same passage share one fetch. */
-const inflight = new Map<string, Promise<Passage>>();
-
 export function peekPassageCache(bibleId: string, reference: Reference): Passage | undefined {
-  return cache.get(passageCacheKey(bibleId, reference));
+  return queryClient.getQueryData(passageQuery(bibleId, reference).queryKey);
 }
 
 export function clearPassageCache(): void {
-  cache.clear();
-  inflight.clear();
+  queryClient.removeQueries({ queryKey: ["passage"] });
+  queryClient.removeQueries({ queryKey: ["passage-pair"] });
 }
 
-/** Fetch a passage once; reuse for preview, library page counts, and file open. */
-export async function fetchPassageCached(
+/**
+ * Fetch a passage once; reuse for preview, library page counts, and file open.
+ *
+ * `signal` abandons only this caller's wait: the request itself is shared,
+ * so it carries on for anyone else waiting and is cached when it lands.
+ */
+export function fetchPassageCached(
   bibleId: string,
   reference: Reference,
   signal: AbortSignal,
 ): Promise<Passage> {
-  const key = passageCacheKey(bibleId, reference);
-  const hit = cache.get(key);
-  if (hit) return hit;
-
-  const pending = inflight.get(key);
-  if (pending) return pending;
-
-  const request = fetchPassage(bibleId, reference, signal)
-    .then((passage) => {
-      cache.set(key, passage);
-      inflight.delete(key);
-      return passage;
-    })
-    .catch((error) => {
-      inflight.delete(key);
-      throw error;
-    });
-
-  inflight.set(key, request);
-  return request;
+  const request = queryClient.fetchQuery(passageQuery(bibleId, reference));
+  if (signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    request.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }

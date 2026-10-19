@@ -2,3 +2,8 @@
 .env
 .env.local
 .env*.local
+
+# browser tests
+.next-e2e/
+test-results/
+playwright-report/

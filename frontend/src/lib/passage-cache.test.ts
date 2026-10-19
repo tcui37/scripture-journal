@@ -4,7 +4,6 @@ import { afterEach, describe, it } from "node:test";
 import {
   clearPassageCache,
   fetchPassageCached,
-  passageCacheKey,
   peekPassageCache,
 } from "./passage-cache";
 import type { Passage, Reference } from "./types";
@@ -31,12 +30,6 @@ const passage: Passage = {
 afterEach(() => {
   globalThis.fetch = originalFetch;
   clearPassageCache();
-});
-
-describe("passageCacheKey", () => {
-  it("combines bible id and range", () => {
-    assert.equal(passageCacheKey("kjv", reference), "kjv|JHN|3:16-3:16");
-  });
 });
 
 describe("fetchPassageCached", () => {
@@ -97,5 +90,44 @@ describe("clearPassageCache", () => {
 
     assert.equal(calls, 2);
     assert.deepEqual(peekPassageCache("kjv", reference), passage);
+  });
+});
+
+describe("fetchPassageCached abort", () => {
+  it("abandons one caller's wait without cancelling the shared request", async () => {
+    let calls = 0;
+    let resolveFetch!: () => void;
+    const fetchGate = new Promise<void>((resolve) => {
+      resolveFetch = resolve;
+    });
+    globalThis.fetch = (async () => {
+      calls += 1;
+      await fetchGate;
+      return new Response(JSON.stringify(passage), { status: 200 });
+    }) as typeof fetch;
+
+    const leaving = new AbortController();
+    const first = fetchPassageCached("kjv", reference, leaving.signal);
+    const second = fetchPassageCached("kjv", reference, new AbortController().signal);
+    leaving.abort();
+
+    await assert.rejects(first, { name: "AbortError" });
+    resolveFetch();
+    assert.deepEqual(await second, passage);
+    assert.equal(calls, 1);
+  });
+
+  it("does not retry a licence rejection", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return new Response(JSON.stringify({ detail: "allows at most 42 verses" }), { status: 422 });
+    }) as typeof fetch;
+
+    await assert.rejects(
+      fetchPassageCached("esv", reference, new AbortController().signal),
+      /at most 42 verses/,
+    );
+    assert.equal(calls, 1);
   });
 });

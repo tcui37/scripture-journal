@@ -3,6 +3,7 @@ import { Caprasimo, Figtree, Source_Serif_4 } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
 import AuthProvider from "@/components/AuthProvider";
+import QueryProvider from "@/components/QueryProvider";
 import { APP_TAGLINE } from "@/lib/constants";
 
 import "./globals.css";
@@ -47,7 +48,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${heading.variable} ${body.variable} ${serif.variable}`}>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <QueryProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

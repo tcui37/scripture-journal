@@ -6,6 +6,18 @@ import type {
   Reference,
 } from "./types";
 
+/** A non-2xx answer from the API, keeping the status so callers can tell a
+ * licence rejection (4xx, final) from an upstream hiccup (5xx, retryable). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(path, { signal });
 
@@ -14,7 +26,7 @@ async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
       .json()
       .then((body) => body?.detail)
       .catch(() => null);
-    throw new Error(detail ?? `HTTP ${response.status}`);
+    throw new ApiError(detail ?? `HTTP ${response.status}`, response.status);
   }
 
   return response.json() as Promise<T>;

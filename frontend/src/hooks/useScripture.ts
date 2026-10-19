@@ -1,15 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import {
-  fetchBibles,
-  fetchBooks,
-  fetchLanguages,
-  fetchVerseNumbers,
-} from "@/lib/api";
-import { fetchPassageCached } from "@/lib/passage-cache";
+  keepPreviousData,
+  useQueries,
+  useQuery,
+  type UseQueryResult,
+} from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import { mergeBibles, uniqueLanguages } from "@/lib/bibles";
+import {
+  biblesQuery,
+  booksQuery,
+  languagesQuery,
+  passagePairQuery,
+  versesQuery,
+} from "@/lib/queries";
 import type {
   BibleSummary,
   Book,
@@ -17,12 +23,6 @@ import type {
   Passage,
   Reference,
 } from "@/lib/types";
-
-const verseKey = (reference: Reference, chapter: string) =>
-  `${reference.bibleId}/${reference.bookId}/${chapter}`;
-
-const isAbort = (error: unknown) =>
-  error instanceof DOMException && error.name === "AbortError";
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "failed";
@@ -47,41 +47,39 @@ export interface Scripture {
   failed: boolean;
 }
 
+const NO_VERSES: string[] = [];
+
+/** Every selected language's translations as one list. TanStack shares the
+ * result structurally, so it keeps its identity while the data is unchanged. */
+function combineBibles(results: UseQueryResult<BibleSummary[]>[]) {
+  return {
+    bibles: mergeBibles(results.flatMap((result) => (result.data ? [result.data] : []))),
+    error: results.find((result) => result.error)?.error ?? null,
+  };
+}
+
 /**
  * Owns everything to do with *which* scripture is on screen: the catalogue,
  * the current reference, and the fetched passages. Rendering settings live in
  * the component; this hook knows nothing about page layout.
+ *
+ * Fetching, caching, de-duplication and cancellation are TanStack Query's
+ * (see lib/queries.ts); what is left here is keeping the reference valid as
+ * the structure it points into arrives.
  */
 export function useScripture(
   initial: Reference,
   initialLanguages: string[],
   ready: boolean,
 ): Scripture {
-  const [languages, setLanguages] = useState<LanguageSummary[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState(() =>
     uniqueLanguages(initialLanguages),
   );
-  const [biblesByLanguage, setBiblesByLanguage] = useState<Record<string, BibleSummary[]>>(
-    {},
-  );
-  const [books, setBooks] = useState<{ bibleId: string; list: Book[] }>({
-    bibleId: "",
-    list: [],
-  });
-  const [verseCache, setVerseCache] = useState<Record<string, string[]>>({});
-  const [passage, setPassage] = useState<Passage | null>(null);
-  const [comparePassage, setComparePassage] = useState<Passage | null>(null);
   const [reference, setReferenceState] = useState<Reference>(initial);
-  const [status, setStatus] = useState("");
-  const [failed, setFailed] = useState(false);
 
   // localStorage is read after mount; apply it once before any translation fetch.
   useEffect(() => {
-    if (!ready) {
-      setFailed(false);
-      setStatus("");
-      return;
-    }
+    if (!ready) return;
     setSelectedLanguages(uniqueLanguages(initialLanguages));
     setReferenceState(initial);
     // Intentionally once, when the parent has finished reading storage.
@@ -91,159 +89,65 @@ export function useScripture(
   // Set when a change should pull the end verse to the end of its chapter,
   // which we can only do once that chapter's verse list has arrived.
   const snapEndToLast = useRef(false);
-  const languagesFetchedRef = useRef(false);
-
-  const startKey = verseKey(reference, reference.startChapter);
-  const endKey = verseKey(reference, reference.endChapter);
-  const startVerses = useMemo(() => verseCache[startKey] ?? [], [verseCache, startKey]);
-  const endVerses = useMemo(() => verseCache[endKey] ?? [], [verseCache, endKey]);
-
-  const fail = useCallback(
-    (prefix: string) => (error: unknown) => {
-      if (isAbort(error)) return;
-      setFailed(true);
-      setStatus(`${prefix} — ${message(error)}`);
-      // Drop the preview so a stale passage can't be printed.
-      setPassage(null);
-      setComparePassage(null);
-    },
-    [],
-  );
-
-  const begin = useCallback((text: string) => {
-    setFailed(false);
-    setStatus(text);
-  }, []);
 
   /* ── catalogue ───────────────────────────────────────────────────────── */
 
-  const selectedKey = selectedLanguages.join(",");
+  const languagesResult = useQuery({ ...languagesQuery(), enabled: ready });
 
-  useEffect(() => {
-    if (!ready) {
-      languagesFetchedRef.current = false;
-      return;
-    }
-
-    const controller = new AbortController();
-    const missing = selectedLanguages.filter((code) => !(code in biblesByLanguage));
-
-    if (!languagesFetchedRef.current) {
-      fetchLanguages(controller.signal)
-        .then((list) => {
-          languagesFetchedRef.current = true;
-          setLanguages(list);
-        })
-        .catch(fail("Languages failed"));
-    }
-
-    if (missing.length) {
-      Promise.all(
-        missing.map((code) =>
-          fetchBibles(code, controller.signal).then((list) => [code, list] as const),
-        ),
-      )
-        .then((entries) =>
-          setBiblesByLanguage((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
-        )
-        .catch(fail("Versions failed"));
-    }
-
-    return () => controller.abort();
-    // biblesByLanguage is read to skip cached languages; listing it would
-    // re-run after every successful fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, selectedKey, fail]);
-
-  const bibles = useMemo(
-    () =>
-      mergeBibles(
-        selectedLanguages
-          .map((code) => biblesByLanguage[code])
-          .filter((list): list is BibleSummary[] => Boolean(list)),
-      ),
-    [selectedLanguages, biblesByLanguage],
-  );
+  const { bibles, error: biblesError } = useQueries({
+    queries: selectedLanguages.map((code) => ({ ...biblesQuery(code), enabled: ready })),
+    combine: combineBibles,
+  });
 
   /* ── structure ───────────────────────────────────────────────────────── */
 
+  const booksResult = useQuery({
+    ...booksQuery(reference.bibleId),
+    enabled: ready && Boolean(reference.bibleId),
+  });
+  const bookList = booksResult.data;
+  const book = bookList?.find((entry) => entry.id === reference.bookId);
+
+  // Keep the book and chapters valid for whichever translation's books arrived.
   useEffect(() => {
-    if (!ready) return;
-    const controller = new AbortController();
-    const { bibleId } = reference;
+    if (!bookList) return;
+    const bibleId = reference.bibleId;
+    setReferenceState((prev) => {
+      if (prev.bibleId !== bibleId) return prev;
+      const found = bookList.find((entry) => entry.id === prev.bookId) ?? bookList[0];
+      if (!found) return prev;
 
-    begin("Loading books…");
-    fetchBooks(bibleId, controller.signal)
-      .then((list) => {
-        setBooks({ bibleId, list });
-        setReferenceState((prev) => {
-          if (prev.bibleId !== bibleId) return prev;
-          const book = list.find((entry) => entry.id === prev.bookId) ?? list[0];
-          if (!book) return prev;
+      const numbers = found.chapters.map((chapter) => chapter.number);
+      const fallback = numbers[0] ?? prev.startChapter;
+      const startChapter = numbers.includes(prev.startChapter) ? prev.startChapter : fallback;
+      let endChapter = numbers.includes(prev.endChapter) ? prev.endChapter : fallback;
+      if (Number(endChapter) < Number(startChapter)) endChapter = startChapter;
 
-          const numbers = book.chapters.map((chapter) => chapter.number);
-          const fallback = numbers[0] ?? prev.startChapter;
-          const startChapter = numbers.includes(prev.startChapter) ? prev.startChapter : fallback;
-          let endChapter = numbers.includes(prev.endChapter) ? prev.endChapter : fallback;
-          if (Number(endChapter) < Number(startChapter)) endChapter = startChapter;
-
-          if (
-            book.id === prev.bookId &&
-            startChapter === prev.startChapter &&
-            endChapter === prev.endChapter
-          ) {
-            return prev;
-          }
-          return { ...prev, bookId: book.id, startChapter, endChapter };
-        });
-      })
-      .catch(fail("Books failed"));
-
-    return () => controller.abort();
-  }, [ready, reference.bibleId, begin, fail]);
+      if (
+        found.id === prev.bookId &&
+        startChapter === prev.startChapter &&
+        endChapter === prev.endChapter
+      ) {
+        return prev;
+      }
+      return { ...prev, bookId: found.id, startChapter, endChapter };
+    });
+    // reference.bibleId is read only to confirm these books still apply.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookList]);
 
   // Verse numbers for whichever chapters the range currently touches.
-  useEffect(() => {
-    if (!ready) return;
-    if (books.bibleId !== reference.bibleId) return;
-    if (!books.list.some((book) => book.id === reference.bookId)) return;
-
-    const wanted = [
-      [startKey, reference.startChapter] as const,
-      [endKey, reference.endChapter] as const,
-    ].filter(
-      ([key], index, all) =>
-        !(key in verseCache) && all.findIndex(([other]) => other === key) === index,
-    );
-    if (!wanted.length) return;
-
-    const controller = new AbortController();
-    begin("Loading chapter…");
-
-    Promise.all(
-      wanted.map(([key, chapter]) =>
-        fetchVerseNumbers(reference.bibleId, reference.bookId, chapter, controller.signal).then(
-          (list) => [key, list] as const,
-        ),
-      ),
-    )
-      .then((entries) => setVerseCache((prev) => ({ ...prev, ...Object.fromEntries(entries) })))
-      .catch(fail("Chapter failed"));
-
-    return () => controller.abort();
-  }, [
-    ready,
-    books,
-    verseCache,
-    startKey,
-    endKey,
-    reference.bibleId,
-    reference.bookId,
-    reference.startChapter,
-    reference.endChapter,
-    begin,
-    fail,
-  ]);
+  const versesEnabled = ready && Boolean(book);
+  const startVersesResult = useQuery({
+    ...versesQuery(reference.bibleId, reference.bookId, reference.startChapter),
+    enabled: versesEnabled,
+  });
+  const endVersesResult = useQuery({
+    ...versesQuery(reference.bibleId, reference.bookId, reference.endChapter),
+    enabled: versesEnabled,
+  });
+  const startVerses = (versesEnabled && startVersesResult.data) || NO_VERSES;
+  const endVerses = (versesEnabled && endVersesResult.data) || NO_VERSES;
 
   // Keep the verse selections valid for the chapters they belong to.
   useEffect(() => {
@@ -272,32 +176,44 @@ export function useScripture(
 
   /* ── text ────────────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    if (!ready) return;
-    // Wait until both chapters' verse lists match the current selection, so we
-    // never request a range built from a previous chapter's numbering.
-    if (!startVerses.includes(reference.startVerse)) return;
-    if (!endVerses.includes(reference.endVerse)) return;
+  // Wait until both chapters' verse lists match the current selection, so we
+  // never request a range built from a previous chapter's numbering.
+  const rangeReady =
+    startVerses.includes(reference.startVerse) && endVerses.includes(reference.endVerse);
+  const passageResult = useQuery({
+    ...passagePairQuery(reference),
+    enabled: ready && rangeReady,
+    // Keep the last passage on screen while the next one loads.
+    placeholderData: keepPreviousData,
+  });
 
-    const controller = new AbortController();
-    const span = Number(reference.endChapter) - Number(reference.startChapter) + 1;
-    begin(span > 1 ? `Fetching ${span} chapters…` : "Fetching text…");
+  /* ── status ──────────────────────────────────────────────────────────── */
 
-    const primary = fetchPassageCached(reference.bibleId, reference, controller.signal);
-    const compare = reference.compareId
-      ? fetchPassageCached(reference.compareId, reference, controller.signal)
-      : Promise.resolve(null);
+  const failure =
+    (languagesResult.error && `Languages failed — ${message(languagesResult.error)}`) ||
+    (biblesError && `Versions failed — ${message(biblesError)}`) ||
+    (booksResult.error && `Books failed — ${message(booksResult.error)}`) ||
+    ((startVersesResult.error || endVersesResult.error) &&
+      `Chapter failed — ${message(startVersesResult.error ?? endVersesResult.error)}`) ||
+    (passageResult.error && `Passage failed — ${message(passageResult.error)}`) ||
+    "";
 
-    Promise.all([primary, compare])
-      .then(([first, second]) => {
-        setPassage(first);
-        setComparePassage(second);
-        setStatus("");
-      })
-      .catch(fail("Passage failed"));
+  const span = Number(reference.endChapter) - Number(reference.startChapter) + 1;
+  const loading = !ready
+    ? ""
+    : booksResult.isFetching
+      ? "Loading books…"
+      : startVersesResult.isFetching || endVersesResult.isFetching
+        ? "Loading chapter…"
+        : passageResult.isFetching
+          ? span > 1
+            ? `Fetching ${span} chapters…`
+            : "Fetching text…"
+          : "";
 
-    return () => controller.abort();
-  }, [ready, startVerses, endVerses, reference, begin, fail]);
+  const failed = Boolean(failure);
+  // Drop the preview on any failure so a stale passage can't be printed.
+  const pair = failed ? undefined : passageResult.data;
 
   /* ── handlers ────────────────────────────────────────────────────────── */
 
@@ -321,14 +237,12 @@ export function useScripture(
         return;
       }
 
-      if (patch.bibleId !== undefined || patch.bookId !== undefined) {
-        // A new translation or book may number things differently.
-        if (patch.bookId !== undefined) {
-          next.startChapter = "1";
-          next.startVerse = "1";
-          next.endChapter = "1";
-          snap = true;
-        }
+      if (patch.bookId !== undefined) {
+        // A new book may number things differently.
+        next.startChapter = "1";
+        next.startVerse = "1";
+        next.endChapter = "1";
+        snap = true;
       }
 
       if (patch.startChapter !== undefined) {
@@ -361,8 +275,6 @@ export function useScripture(
     },
     [reference],
   );
-
-  const book = books.list.find((entry) => entry.id === reference.bookId);
 
   const wholeChapter = useCallback(() => {
     snapEndToLast.current = true;
@@ -405,12 +317,12 @@ export function useScripture(
   }, [bibles]);
 
   return {
-    languages,
+    languages: languagesResult.data ?? [],
     selectedLanguages,
     addLanguage,
     removeLanguage,
     bibles,
-    books: books.list,
+    books: bookList ?? [],
     book,
     startVerses,
     endVerses,
@@ -418,9 +330,9 @@ export function useScripture(
     setReference,
     wholeChapter,
     entireBook,
-    passage,
-    comparePassage,
-    status,
+    passage: pair?.primary ?? null,
+    comparePassage: pair?.compare ?? null,
+    status: failure || loading,
     failed,
   };
 }
