@@ -19,14 +19,24 @@ The FastAPI package stays under `backend/app/`; Vercel only needs
 backend/          FastAPI — keys, four upstreams, accounts
   api/index.py     Vercel ASGI entry; vercel.json rewrites every path here
   app/             application package (not flattened into api/)
+    sources.py       every upstream declared once: trust, key, client, cache TTL
+    providers/       one chapter source per upstream (list books, fetch a chapter)
+    passages.py      ranges from chapters: fan-out, trimming, chapter markers
+    cache.py         chapter/book cache: memory LRU + optional Supabase tier
+  scripts/         layout_fixtures.py — regenerates frontend browser-test fixtures
   .python-version  Python 3.13 on Vercel
   .vercelignore    .venv, .env, tests, caches
 frontend/         Next.js App Router — layout, pagination, print
   next.config.ts   rewrites /api/:path* → $API_URL/api/:path* (build-time)
   src/app/globals.css   design tokens and UI styles (source of truth for the app)
+  src/lib/typeset/ passage → blocks → pages → sheet HTML (no React)
+  src/lib/queries.ts    every API request, as TanStack Query definitions
+  src/lib/store.ts      saved journal state (zustand, localStorage)
+  src/lib/api-schema.ts generated from the backend's OpenAPI (npm run gen:types)
+  e2e/             Playwright: app flows and typesetting in real Chrome
   .env.example     API_URL
   .vercelignore    .env, .next, node_modules
-supabase/         SQL migrations for accounts, files, saved page layouts
+supabase/         SQL migrations: accounts, files, layouts, scripture_cache
 ```
 
 ### Translation sources
@@ -67,9 +77,11 @@ Not offered (no licensed or keyless source; we do not scrape): RCUV /
 hidden when a more trusted source already serves the same text (helloao CUV
 stays; FEB comes from api.bible when the key is set).
 
-Ranges are fetched one chapter at a time — api.bible's `/passages` endpoint
-silently truncates long requests. Chapter responses are memoised for the
-process lifetime.
+Ranges are built from whole chapters — api.bible's `/passages` endpoint
+silently truncates long requests — so a source only implements `list_books`
+and `fetch_chapter`, and `passages.py` does the rest. Whole chapters are the
+cached unit: John 3:16 and John 3:1-21 share one upstream request, and verse
+lists for api.bible and helloao are read off the cached chapter.
 
 ## API limits and licence terms
 
@@ -93,7 +105,7 @@ not reported). If one is copyright-reserved, give it a curated entry in
 
 | Source | Limit |
 | --- | --- |
-| api.bible | billed per request; chapters cached in-process; concurrent readers share one request |
+| api.bible | billed per request; books and chapters cached (memory + Supabase, 29 days); concurrent readers share one request |
 | ESV | 60/min, 1,000/hour, 5,000/day; 4 concurrent chapters; 429 surfaced |
 | bible-api.com | 15 requests / 30s per IP, paced in `bible_api/client.py` |
 | helloao | none stated |
@@ -101,9 +113,13 @@ not reported). If one is copyright-reserved, give it a curated entry in
 A passage costs one upstream request per chapter (150 for Psalms). bible-api.com
 asks not to download an entire Bible.
 
-**Caching.** api.bible cached content must refresh at least every 30 days
-(`CACHE_TTL_SECONDS` in `api_bible/client.py`). ESV is never cached (Crossway
-forbids storing more than 500 verses).
+**Caching.** Each source's TTL is in `sources.py`. api.bible cached content
+must refresh at least every 30 days, so it is kept 29 (a value read back from
+Supabase keeps its original expiry, and expired rows are swept). ESV is never
+cached anywhere (Crossway forbids storing more than 500 verses). With
+`SUPABASE_SERVICE_ROLE_KEY` set and the `scripture_cache` migration applied,
+chapters are shared across serverless instances, so a cold start does not
+re-buy them; without it, each process keeps its own memory cache.
 
 **Attribution.** Translation abbreviation and provider link on every text page
 (footer); publisher copyright once, on the last sheet and in the sidebar.
@@ -183,8 +199,8 @@ Or manually: `rm -rf frontend/.next && npm run dev`.
 **Lazy library loading.** Saved files and saved page layouts are not fetched on
 sign-in. The Files panel loads your library when you open the Files tab; the
 Designs section loads saved layouts when you expand Designs in the sidebar.
-Passage text is cached in memory so preview, file open, and page-count
-calculation share one fetch per range.
+Passage text is cached by TanStack Query (`src/lib/queries.ts`) so preview,
+file open, and page-count calculation share one fetch per range.
 
 ## Environment variables
 
@@ -201,6 +217,7 @@ Names only — never commit values. Local: `backend/.env`, `frontend/.env.local`
 | `REQUEST_TIMEOUT` | backend | default `20.0` | same |
 | `SUPABASE_URL` | backend | for accounts / files / saved layouts | required for those features |
 | `SUPABASE_ANON_KEY` | backend | `.env` | required for those features |
+| `SUPABASE_SERVICE_ROLE_KEY` | backend | optional | shares fetched chapters across instances (`scripture_cache`); server-only, never in the browser |
 | `SINGLE_USER` | backend | `true` allowed locally | **forced `false`** on production and preview. `vercel dev` (`VERCEL_ENV=development`) counts as local |
 | `HIDDEN_TRANSLATION_IDS` | backend | leave unset | extra ids to omit, e.g. `nasb,csb`. **NIV is already omitted** on production and preview |
 | `API_URL` | frontend | default `http://127.0.0.1:8000` | API project's URL, **no trailing slash**. Read at **build time** in `next.config.ts` — changing it requires a frontend redeploy |
@@ -267,5 +284,19 @@ by [Spencer Goldade](https://spencergoldade.ca).
   scripture) and **journal files** (passage + layout) via Supabase.
 - When printing, leave margins at none. Ruled lines and paper tint survive
   "Background graphics" off (`.jpage` uses `print-color-adjust: exact`).
-- In-process caches help little on serverless: each cold start starts empty, so
-  the same passage can be re-fetched and re-billed.
+- Without `SUPABASE_SERVICE_ROLE_KEY`, chapter caches are per process: on
+  serverless each cold start starts empty, so the same chapter can be
+  re-fetched and re-billed.
+
+### Tests
+
+| Command | Where | What |
+| --- | --- | --- |
+| `.venv/bin/python -m pytest` | `backend/` | parsers, passage assembly, caches, router, accounts — stubbed upstreams |
+| `npm test` | `frontend/` | typesetting logic, limits, store, queries |
+| `npm run test:e2e` | `frontend/` | Playwright in installed Chrome: app flows, saved state, and typesetting over public-domain fixtures |
+| `npm run gen:types` | `frontend/` | regenerate `src/lib/api-schema.ts` after changing `backend/app/schemas.py` |
+
+The e2e suite starts its own backend (:8001, both API keys blanked) and dev
+server (:3001, `.next-e2e`), so it never spends api.bible quota and does not
+disturb a running dev server.

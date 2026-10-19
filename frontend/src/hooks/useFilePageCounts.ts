@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { computeFilePageCounts } from "@/lib/file-page-counts";
-import { Measurer } from "@/lib/paginate";
+import { Measurer } from "@/lib/typeset";
 import type { JournalFile, Reference } from "@/lib/types";
 
 /**

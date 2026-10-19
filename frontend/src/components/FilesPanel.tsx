@@ -19,7 +19,7 @@ import {
   passageFromReference,
   updateFile,
 } from "@/lib/account";
-import { formatFileMetaLine } from "@/lib/pages";
+import { formatFileMetaLine } from "@/lib/typeset";
 import type { JournalFile, Reference, Settings } from "@/lib/types";
 
 const FOCUSABLE =

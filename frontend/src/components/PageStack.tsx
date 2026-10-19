@@ -1,5 +1,5 @@
 import { PAGE_STACK_GAP_PX, PAPER_COLORS } from "@/lib/constants";
-import { pageDimensions, pageHtml, type Geometry } from "@/lib/render";
+import { pageDimensions, pageHtml, type Geometry } from "@/lib/typeset";
 import type { Settings } from "@/lib/types";
 
 interface PageStackProps {

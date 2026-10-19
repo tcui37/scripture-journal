@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DEFAULT_SETTINGS, PAGE_SIZES } from "./constants";
+import { DEFAULT_SETTINGS, PAGE_SIZES } from "../constants";
 import {
   geometry,
   pageDimensions,
@@ -11,7 +11,7 @@ import {
   singleTextGeometry,
   verseHtml,
 } from "./render";
-import type { Paragraph, Settings } from "./types";
+import type { Paragraph, Settings } from "../types";
 
 const settings = (overrides: Partial<Settings> = {}): Settings => ({
   ...DEFAULT_SETTINGS,

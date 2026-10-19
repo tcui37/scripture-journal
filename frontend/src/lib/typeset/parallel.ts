@@ -8,7 +8,7 @@
  * span both columns.
  */
 
-import type { Paragraph, Verse } from "./types";
+import type { Paragraph, Verse } from "../types";
 
 export interface AlignedRow {
   kind: "heading" | "chapter" | "verse";

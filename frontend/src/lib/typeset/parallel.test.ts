@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { combineParallelBands, combineParallelColumns } from "./blocks";
-import { parallelSideLabels } from "./constants";
+import { parallelSideLabels } from "../constants";
 import { alignPassages, citationIds, orderedSides } from "./parallel";
-import type { Paragraph } from "./types";
+import type { Paragraph } from "../types";
 
 const verse = (number: string, text: string) => ({
   number,

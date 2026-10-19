@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { paragraphBlocks } from "./blocks";
-import { DEFAULT_SETTINGS } from "./constants";
+import { DEFAULT_SETTINGS } from "../constants";
 import { paginate, type Measurer } from "./paginate";
-import type { Paragraph } from "./types";
+import type { Paragraph } from "../types";
 
 const words = (html: string) =>
   html.replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean);

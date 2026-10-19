@@ -15,7 +15,7 @@ import {
 import { alignPassages, orderedSides } from "./parallel";
 import { Measurer, paginate } from "./paginate";
 import { singleTextGeometry } from "./render";
-import type { PageSize, Passage, Settings } from "./types";
+import type { PageSize, Passage, Settings } from "../types";
 
 /** Flow passage text into page slot markup — mirrors the journal preview. */
 export function paginatePassages(

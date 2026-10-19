@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DEFAULT_SETTINGS } from "./constants";
+import { DEFAULT_SETTINGS } from "../constants";
 import {
   formatFileMetaLine,
   formatPageCountLabel,
   formatPageCountMeta,
   printedPageCount,
 } from "./pages";
-import type { Settings } from "./types";
+import type { Settings } from "../types";
 
 const settings = (overrides: Partial<Settings> = {}): Settings => ({
   ...DEFAULT_SETTINGS,

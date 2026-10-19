@@ -6,10 +6,10 @@
  * possible, split. Both passage shapes are expressed as `Block`s here.
  */
 
-import { HAIRLINE } from "./constants";
+import { HAIRLINE } from "../constants";
 import { chapterHtml, headingHtml, paragraphHtml, typeCss, verseHtml } from "./render";
 import type { AlignedRow } from "./parallel";
-import type { Paragraph, Segment, Settings, Verse } from "./types";
+import type { Paragraph, Segment, Settings, Verse } from "../types";
 
 export interface Block {
   /** Splittable sub-units (words). 1 means indivisible. */

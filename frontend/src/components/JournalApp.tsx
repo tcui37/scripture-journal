@@ -18,10 +18,10 @@ import {
   formatPageCountLabel,
   paginatePassages,
   printedPageCount,
-} from "@/lib/pages";
-import { Measurer } from "@/lib/paginate";
-import { orderedSides } from "@/lib/parallel";
-import { pageDimensions, singleTextGeometry } from "@/lib/render";
+} from "@/lib/typeset";
+import { Measurer } from "@/lib/typeset";
+import { orderedSides } from "@/lib/typeset";
+import { pageDimensions, singleTextGeometry } from "@/lib/typeset";
 import { hydrateJournalStore, useJournalStore } from "@/lib/store";
 import type { JournalFile } from "@/lib/types";
 

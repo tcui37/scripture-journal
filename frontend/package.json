@@ -7,7 +7,7 @@
     "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test $(find src -name '*.test.ts')",
     "gen:types": "mkdir -p node_modules/.cache && (cd ../backend && .venv/bin/python -c 'import json; from app.main import app; print(json.dumps(app.openapi()))') > node_modules/.cache/openapi.json && openapi-typescript node_modules/.cache/openapi.json -o src/lib/api-schema.ts",
     "test:e2e": "playwright test"
   },

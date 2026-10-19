@@ -1,7 +1,7 @@
 import { referenceFromJournalFile } from "./account";
 import { fetchPassageCached } from "./passage-cache";
-import { countPrintedPages } from "./pages";
-import type { Measurer } from "./paginate";
+import { countPrintedPages } from "./typeset";
+import type { Measurer } from "./typeset";
 import type { JournalFile } from "./types";
 
 const DEFAULT_CONCURRENCY = 3;

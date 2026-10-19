@@ -5,7 +5,7 @@
  * text and a link back on every page, and the publisher's full notice once.
  */
 
-import { citationIds } from "./parallel";
+import { citationIds } from "./typeset";
 import type { BibleSummary, Passage, Reference } from "./types";
 
 /** Trimmed, de-duplicated, empties dropped — for assembling licence notices. */

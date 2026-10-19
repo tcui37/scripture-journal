@@ -3,7 +3,7 @@ import { afterEach, describe, it } from "node:test";
 
 import { clearPassageCache } from "./passage-cache";
 import { computeFilePageCounts, mapWithConcurrency } from "./file-page-counts";
-import type { Measurer } from "./paginate";
+import type { Measurer } from "./typeset";
 import type { JournalFile, Passage } from "./types";
 
 const originalFetch = globalThis.fetch;

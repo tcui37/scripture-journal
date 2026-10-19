@@ -19,8 +19,8 @@ import {
   TEXT_SHARE_MAX,
   TEXT_SHARE_MIN,
   WORDS_OF_CHRIST,
-} from "./constants";
-import type { Paragraph, PoetryIndent, Settings, Verse } from "./types";
+} from "../constants";
+import type { Paragraph, PoetryIndent, Settings, Verse } from "../types";
 
 export const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
