@@ -6,9 +6,9 @@ import {
   useQuery,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-import { mergeBibles, uniqueLanguages } from "@/lib/bibles";
+import { mergeBibles } from "@/lib/bibles";
 import {
   biblesQuery,
   booksQuery,
@@ -16,6 +16,7 @@ import {
   passagePairQuery,
   versesQuery,
 } from "@/lib/queries";
+import { useJournalStore } from "@/lib/store";
 import type {
   BibleSummary,
   Book,
@@ -67,24 +68,12 @@ function combineBibles(results: UseQueryResult<BibleSummary[]>[]) {
  * (see lib/queries.ts); what is left here is keeping the reference valid as
  * the structure it points into arrives.
  */
-export function useScripture(
-  initial: Reference,
-  initialLanguages: string[],
-  ready: boolean,
-): Scripture {
-  const [selectedLanguages, setSelectedLanguages] = useState(() =>
-    uniqueLanguages(initialLanguages),
-  );
-  const [reference, setReferenceState] = useState<Reference>(initial);
-
-  // localStorage is read after mount; apply it once before any translation fetch.
-  useEffect(() => {
-    if (!ready) return;
-    setSelectedLanguages(uniqueLanguages(initialLanguages));
-    setReferenceState(initial);
-    // Intentionally once, when the parent has finished reading storage.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+export function useScripture(ready: boolean): Scripture {
+  // The selection lives in the journal store, so it is saved with the rest.
+  const reference = useJournalStore((state) => state.reference);
+  const selectedLanguages = useJournalStore((state) => state.languages);
+  const setReferenceState = useJournalStore((state) => state.updateReference);
+  const updateLanguages = useJournalStore((state) => state.updateLanguages);
 
   // Set when a change should pull the end verse to the end of its chapter,
   // which we can only do once that chapter's verse list has arrived.
@@ -134,7 +123,7 @@ export function useScripture(
     });
     // reference.bibleId is read only to confirm these books still apply.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookList]);
+  }, [bookList, setReferenceState]);
 
   // Verse numbers for whichever chapters the range currently touches.
   const versesEnabled = ready && Boolean(book);
@@ -172,7 +161,7 @@ export function useScripture(
       if (startVerse === prev.startVerse && endVerse === prev.endVerse) return prev;
       return { ...prev, startVerse, endVerse };
     });
-  }, [startVerses, endVerses]);
+  }, [startVerses, endVerses, setReferenceState]);
 
   /* ── text ────────────────────────────────────────────────────────────── */
 
@@ -233,7 +222,7 @@ export function useScripture(
         patch.endVerse !== undefined;
       if (completeSelection) {
         snapEndToLast.current = false;
-        setReferenceState(next);
+        setReferenceState(() => next);
         return;
       }
 
@@ -271,15 +260,15 @@ export function useScripture(
       }
 
       if (snap) snapEndToLast.current = true;
-      setReferenceState(next);
+      setReferenceState(() => next);
     },
-    [reference],
+    [reference, setReferenceState],
   );
 
   const wholeChapter = useCallback(() => {
     snapEndToLast.current = true;
     setReferenceState((prev) => ({ ...prev, startVerse: "1", endChapter: prev.startChapter }));
-  }, []);
+  }, [setReferenceState]);
 
   const entireBook = useCallback(() => {
     const last = book?.chapters[book.chapters.length - 1]?.number;
@@ -291,15 +280,17 @@ export function useScripture(
       startVerse: "1",
       endChapter: last,
     }));
-  }, [book]);
+  }, [book, setReferenceState]);
 
-  const addLanguage = useCallback((code: string) => {
-    setSelectedLanguages((prev) => uniqueLanguages([...prev, code]));
-  }, []);
+  const addLanguage = useCallback(
+    (code: string) => updateLanguages((prev) => [...prev, code]),
+    [updateLanguages],
+  );
 
-  const removeLanguage = useCallback((code: string) => {
-    setSelectedLanguages((prev) => uniqueLanguages(prev.filter((entry) => entry !== code)));
-  }, []);
+  const removeLanguage = useCallback(
+    (code: string) => updateLanguages((prev) => prev.filter((entry) => entry !== code)),
+    [updateLanguages],
+  );
 
   useEffect(() => {
     if (!bibles.length) return;
@@ -314,7 +305,7 @@ export function useScripture(
       if (bibleId === prev.bibleId && compareId === prev.compareId) return prev;
       return { ...prev, bibleId, compareId };
     });
-  }, [bibles]);
+  }, [bibles, setReferenceState]);
 
   return {
     languages: languagesResult.data ?? [],
