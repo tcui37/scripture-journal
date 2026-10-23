@@ -35,3 +35,7 @@ next-env.d.ts
 
 # Vercel CLI link metadata
 .vercel/
+
+# local tool state
+.claude/settings.local.json
+supabase/.temp/
